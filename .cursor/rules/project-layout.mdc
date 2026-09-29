@@ -1,0 +1,22 @@
+---
+description: OMS Terraform project layout and region conventions
+alwaysApply: true
+---
+
+# OMS Terraform — Project Facts
+
+## Region
+- **Actual/canonical AWS region is `ap-southeast-1`.**
+- Any `us-east-1` references come from an old deployment and are NOT current.
+
+## Folder roles
+- **`infra/`** — the actual, working Terraform code. This is what you edit and deploy.
+  - `infra/modules/alfapro/` — main module.
+  - `infra/environments/dev/` and `infra/environments/prod/` — root configs per environment.
+- **`awsterrafrom/`** — documentation and recovered backup files only. NOT source of truth.
+  - `OMS-Architecture.pdf`, `INFRASTRUCTURE.md` — docs.
+  - `terraform.json` / `terraform copy.json` — a recovered Terraform **state** snapshot from the old `us-east-1` deployment. Do not treat as config to edit.
+
+## Guidance
+- Make infrastructure changes in `infra/` only.
+- Treat `ap-southeast-1` as correct when reconciling against the recovered `us-east-1` state.

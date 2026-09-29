@@ -1,0 +1,15 @@
+# Local Terraform state & caches
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Environment config & secrets — keep .env out of version control
+**/.env
+*.tfvars
+!*.tfvars.example
+backend.hcl
+
+# Plans
+*.tfplan

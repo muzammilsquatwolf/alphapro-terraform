@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(cp dev/versions.tf dev/variables.tf dev/main.tf dev/outputs.tf dev/tf.sh prod/)",
+      "Bash(chmod +x dev/tf.sh prod/tf.sh)",
+      "Bash(terraform fmt *)",
+      "Bash(echo \"=== fmt exit: $? ===\")",
+      "Bash(terraform validate *)",
+      "Bash(echo \"=== validate exit: $? ===\")",
+      "Bash(terraform init *)",
+      "Bash(echo \"=== prod validate exit: $? ===\")",
+      "Bash(./tf.sh plan *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(cp dev/variables.tf prod/variables.tf)",
+      "Bash(cp dev/main.tf prod/main.tf)"
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+# Stores in dev — one block per store. Auto-loaded by Terraform (no
+# -var-file flag) because of the .auto.tfvars suffix; see infra/README.md.
+#
+# Each store gets its OWN event_bus. That isolation is the point: a store's
+# 3 EventBridge rules (inventory/orders/products) all attach to its own bus
+# and separate from each other by X-Shopify-Topic prefix, so no store ever
+# sees another store's webhooks.
+#
+# Terraform does NOT create these buses. Per store: install the Shopify
+# EventBridge app, then associate the resulting partner event source with a
+# bus in the AWS console. Each bus is region-scoped — it must exist in
+# TF_VAR_aws_region (ap-southeast-1) or that store's rules fail to create.
+#
+# app_url is NOT here — it's one shared value per environment
+# (TF_VAR_app_url), since every consumer calls back into the same web app.
+#
+# This map drives the whole per-store fan-out: 3 SQS queues + 3 DLQs,
+# 3 EventBridge rules, 3 consumer ECS services, 9 alarms — per store.
+# Adding a key here is the only change needed; no .tf edits.
+
+# Each store has its OWN partner event source, named after that store's
+# domain: squatwolf.com -> squatwolf.com-dev-alphapro,
+# kw.squatwolf.com -> kw.squatwolf.com-dev-alphapro. That per-store bus is
+# what isolates the stores from one another — the rules themselves only match
+# on X-Shopify-Topic, so two stores sharing a bus would cross-contaminate.
+# Give every new store its own source; never point two at the same one.
+#
+# Use the full partner source name, not just the account id — EventBridge
+# resolves the string as a bus name verbatim.
+
+stores = {
+  # CONFIRMED — real, connected bus. Shopify channel "SQUATWOLF Global".
+  uae = {
+    store_name = "AlphaPro UAE"
+    event_bus  = "aws.partner/shopify.com/421054021633/squatwolf.com-dev-alphapro"
+
+    # One ECS service per entry. args is everything after
+    # `python -m app.cli.main`; per-store values like --channel-id and
+    # --app-id live here, not in the module. enabled defaults to true, so
+    # setting it false is how you pause one without deleting the config.
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=1", "--app-id=1", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=1", "--app-id=1", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=1", "--app-id=1", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  # CONFIRMED — real, connected bus. Shopify channel "SQUATWOLF Kuwait".
+  kwt = {
+    store_name = "AlphaPro Kuwait"
+    event_bus  = "aws.partner/shopify.com/421054021633/kw.squatwolf.com-dev-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=3", "--app-id=4", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=3", "--app-id=4", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=3", "--app-id=4", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  # CONFIRMED — real, connected bus. Shopify channel "SQUATWOLF KSA".
+  ksa = {
+    store_name = "AlphaPro KSA"
+    event_bus  = "aws.partner/shopify.com/421054021633/sa.squatwolf.com-dev-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=2", "--app-id=9", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=2", "--app-id=9", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=2", "--app-id=9", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  # CONFIRMED — real, connected bus. Shopify channel "SQUATWOLF Qatar".
+  qat = {
+    store_name = "AlphaPro Qatar"
+    event_bus  = "aws.partner/shopify.com/421054021633/qa.squatwolf.com-dev-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=4", "--app-id=6", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=4", "--app-id=6", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=4", "--app-id=6", "--limit=10", "--full"]
+      }
+    }
+  }
+}

@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<style>
+  /* Base reset. Kept separate from the page's own styles below so the two
+     never fight over specificity. */
+  :root {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>AlphaPro Ops Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --ground:   #eef1f4;
+    --surface:  #ffffff;
+    --sunken:   #f6f8fa;
+    --ink:      #101820;
+    --ink-2:    #3d4a56;
+    --muted:    #66757f;
+    --line:     #d7dee5;
+    --line-2:   #e7ecf0;
+
+    --accent:   #0b6e80;
+    --accent-2: #e2f1f4;
+
+    --ok:       #12734a;
+    --ok-bg:    #e1f3e9;
+    --warn:     #97600a;
+    --warn-bg:  #faeed6;
+    --crit:     #b3372c;
+    --crit-bg:  #fbe4e1;
+    --off:      #7b8a95;
+    --off-bg:   #e8ecf0;
+
+    --shadow: 0 1px 2px rgba(16, 24, 32, .06), 0 4px 14px rgba(16, 24, 32, .05);
+    --radius: 9px;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0a0e13;
+      --surface:  #141b22;
+      --sunken:   #0f151b;
+      --ink:      #e2e9f0;
+      --ink-2:    #bac7d2;
+      --muted:    #7f8f9c;
+      --line:     #212b34;
+      --line-2:   #1a232b;
+
+      --accent:   #4dbfd4;
+      --accent-2: #12313a;
+
+      --ok:       #4bd48c;
+      --ok-bg:    #0f2c1f;
+      --warn:     #f0b44a;
+      --warn-bg:  #332512;
+      --crit:     #ff7f70;
+      --crit-bg:  #381915;
+      --off:      #778794;
+      --off-bg:   #1a232b;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0a0e13;
+    --surface:  #141b22;
+    --sunken:   #0f151b;
+    --ink:      #e2e9f0;
+    --ink-2:    #bac7d2;
+    --muted:    #7f8f9c;
+    --line:     #212b34;
+    --line-2:   #1a232b;
+
+    --accent:   #4dbfd4;
+    --accent-2: #12313a;
+
+    --ok:       #4bd48c;
+    --ok-bg:    #0f2c1f;
+    --warn:     #f0b44a;
+    --warn-bg:  #332512;
+    --crit:     #ff7f70;
+    --crit-bg:  #381915;
+    --off:      #778794;
+    --off-bg:   #1a232b;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------------------------------------------------- instrument bar */
+
+  .bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 30;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding-block: 10px;
+    padding-inline: 16px;
+  }
+
+  .bar-in {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    margin-right: auto;
+  }
+  .brand b {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .brand span {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .02em;
+  }
+
+  .link-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--sunken);
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .beacon {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--off);
+    flex: none;
+  }
+  .link-state[data-link="live"]  { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); color: var(--ok); }
+  .link-state[data-link="live"]  .beacon { background: var(--ok); animation: pulse 2.4s ease-in-out infinite; }
+  .link-state[data-link="stale"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn); }
+  .link-state[data-link="stale"] .beacon { background: var(--warn); }
+  .link-state[data-link="down"]  { color: var(--muted); }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .28; } }
+  @media (prefers-reduced-motion: reduce) {
+    .beacon { animation: none !important; }
+  }
+
+  .ctl {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .ctl:hover { border-color: var(--accent); color: var(--accent); }
+  .ctl:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  select.ctl { cursor: pointer; }
+
+  /* ---------------------------------------------------------------- layout */
+
+  .page {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 18px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .tab {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 7px 14px 9px;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tab .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--off); }
+  .tab .dot[data-state="ok"]   { background: var(--ok); }
+  .tab .dot[data-state="warn"] { background: var(--warn); }
+  .tab .dot[data-state="crit"] { background: var(--crit); }
+
+  /* -------------------------------------------------------------- counters */
+
+  .counters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .counter {
+    background: var(--surface);
+    padding: 13px 15px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .counter dt {
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .counter dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .counter dd small {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .counter[data-state="ok"]   dd { color: var(--ok); }
+  .counter[data-state="warn"] dd { color: var(--warn); }
+  .counter[data-state="crit"] dd { color: var(--crit); }
+  .counter[data-state="off"]  dd { color: var(--muted); }
+
+  /* ------------------------------------------------------------ connect card */
+
+  .connect {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .connect h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .connect p { margin: 0; color: var(--ink-2); max-width: 66ch; }
+  .connect code, .cmd {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .cmd {
+    background: var(--sunken);
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--ink-2);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .cmd b { color: var(--accent); font-weight: 500; }
+  .endpoint-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .endpoint-row label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  input.ctl { cursor: text; min-width: 230px; font-family: var(--mono); }
+
+  /* --------------------------------------------------------------- sections */
+
+  .sec { display: flex; flex-direction: column; gap: 11px; }
+  .sec > header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sec h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .sec header .note {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  /* --------------------------------------------------------------- svc rows */
+
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: grid;
+    grid-template-columns: 3px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0 12px;
+    border-top: 1px solid var(--line-2);
+    padding-right: 14px;
+  }
+  .rows > .row:first-child { border-top: 0; }
+  .row > .stripe { align-self: stretch; background: var(--off); }
+  .row[data-state="ok"]   > .stripe { background: var(--ok); }
+  .row[data-state="warn"] > .stripe { background: var(--warn); }
+  .row[data-state="crit"] > .stripe { background: var(--crit); }
+  .row[data-state="unknown"] > .stripe { background: var(--line); }
+
+  .row-main {
+    padding: 10px 0 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .row-name {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .row-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .row-sub b { font-weight: 500; color: var(--ink-2); }
+  .row-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding: 8px 0;
+  }
+
+  .count {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .count i { font-style: normal; color: var(--muted); font-weight: 400; }
+
+  .pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--off-bg);
+    color: var(--off);
+    white-space: nowrap;
+  }
+  .pill[data-state="ok"]   { background: var(--ok-bg);   color: var(--ok); }
+  .pill[data-state="warn"] { background: var(--warn-bg); color: var(--warn); }
+  .pill[data-state="crit"] { background: var(--crit-bg); color: var(--crit); }
+  .pill[data-state="info"] { background: var(--accent-2); color: var(--accent); }
+
+  /* ----------------------------------------------------------- store panels */
+
+  .stores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 500px) {
+    .stores { grid-template-columns: 1fr; }
+  }
+
+  .store-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--sunken);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .store-head h3 {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -.005em;
+  }
+  .store-key {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-2);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .store-meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .tw { overflow-x: auto; }
+  table.grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.grid th {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  table.grid td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line-2);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  table.grid tr:last-child td { border-bottom: 0; }
+  table.grid th.num, table.grid td.num {
+    text-align: right;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  td.qtype {
+    font-weight: 500;
+    position: relative;
+    padding-left: 18px;
+  }
+  td.qtype::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  td.qtype[data-fifo="true"]::before { border-radius: 1px; background: var(--accent); }
+
+  .zero { color: var(--muted); }
+  .hot  { color: var(--crit); font-weight: 600; }
+  .busy { color: var(--warn); font-weight: 600; }
+
+  /* -------------------------------------------------------------- key/value */
+
+  .kv {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--line-2);
+  }
+  .kv > div {
+    background: var(--surface);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .kv dt {
+    font-size: 10px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .kv dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------------------------------------------------------------- alarms */
+
+  .alarm-name { font-family: var(--mono); font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+  .alarm-reason { color: var(--muted); font-size: 11.5px; white-space: normal; }
+
+  .empty {
+    padding: 18px 16px;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i {
+    width: 8px; height: 8px; border-radius: 2px; display: inline-block;
+    background: var(--off);
+  }
+  .legend i.ok { background: var(--ok); }
+  .legend i.warn { background: var(--warn); }
+  .legend i.crit { background: var(--crit); }
+
+  .foot {
+    font-size: 11.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  .foot code { font-family: var(--mono); }
+</style>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="brand">
+      <b>AlphaPro OMS</b>
+      <span id="brandMeta">ap-southeast-1</span>
+    </div>
+
+    <span class="link-state" id="link" data-link="down">
+      <span class="beacon"></span>
+      <span id="linkText">connecting…</span>
+    </span>
+
+    <select class="ctl" id="interval" aria-label="Refresh interval">
+      <option value="5000">5s</option>
+      <option value="10000" selected>10s</option>
+      <option value="30000">30s</option>
+      <option value="60000">60s</option>
+      <option value="0">manual</option>
+    </select>
+    <button class="ctl" id="pause" aria-label="Pause or resume polling">pause</button>
+    <button class="ctl" id="now">refresh</button>
+    <button class="ctl" id="theme" aria-label="Switch between the light and dark palette">theme</button>
+  </div>
+</header>
+
+<main class="page">
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+
+  <dl class="counters" id="counters"></dl>
+
+  <section class="connect" id="connect" hidden>
+    <h2>No status feed on <code id="epLabel">127.0.0.1:8787</code></h2>
+    <p id="connectWhy">
+      Everything below is read from the Terraform configuration — what
+      <em>should</em> be running. Start the local feed to see what actually is.
+    </p>
+    <div class="cmd">cd infra/scripts
+<b>uv run oms_status.py --profile alpha-pro-ap-southeast-1</b>
+
+then open  http://127.0.0.1:8787</div>
+    <div class="endpoint-row">
+      <label for="endpoint">Feed URL</label>
+      <input class="ctl" id="endpoint" type="url" spellcheck="false" autocomplete="off">
+      <button class="ctl" id="saveEp">connect</button>
+    </div>
+  </section>
+
+  <section class="sec" id="platformSec">
+    <header>
+      <h2>Platform</h2>
+      <span class="note" id="platformNote"></span>
+    </header>
+    <div class="panel"><div class="rows" id="platform"></div></div>
+    <div class="panel" id="infraPanel"><dl class="kv" id="infra"></dl></div>
+  </section>
+
+  <section class="sec" id="storesSec">
+    <header>
+      <h2>Stores</h2>
+      <span class="note">consumer · queue · worker, aligned on the three webhook streams</span>
+    </header>
+    <div class="stores" id="stores"></div>
+    <div class="legend">
+      <span><i class="ok"></i>running</span>
+      <span><i class="warn"></i>degraded / deploying</span>
+      <span><i class="crit"></i>down</span>
+      <span><i></i>stopped (desired 0)</span>
+      <span>■ FIFO queue</span>
+      <span>● standard queue</span>
+    </div>
+  </section>
+
+  <section class="sec" id="alarmsSec">
+    <header>
+      <h2>Alarms</h2>
+      <span class="note" id="alarmNote"></span>
+      <button class="ctl" id="alarmToggle" style="margin-left:auto">show all</button>
+    </header>
+    <div class="panel tw" id="alarms"></div>
+  </section>
+
+  <section class="sec" id="driftSec" hidden>
+    <header>
+      <h2>Drift</h2>
+      <span class="note">running in AWS but not described by this repo's Terraform</span>
+    </header>
+    <div class="panel"><div class="rows" id="drift"></div></div>
+  </section>
+
+  <div class="foot">
+    <span>Polls a local feed only — no AWS credentials ever reach this page.</span>
+    <span>Config mirrors <code>infra/environments/&lt;env&gt;/stores.auto.tfvars</code> + <code>.env</code></span>
+  </div>
+</main>
+
+<script>
+/* ===========================================================================
+   Expected topology, transcribed from the Terraform. This is what the stack
+   is *configured* to run; the live feed says what it *is* running. Rendering
+   the two together is the point — a service in the config with nothing live
+   behind it is exactly the thing worth seeing.
+   =========================================================================== */
+
+const QUEUE_TYPES = [
+  { key: "orders",    fifo: true  },
+  { key: "products",  fifo: false },
+  { key: "inventory", fifo: true  },
+];
+
+const CONFIG = {
+  dev: {
+    label: "dev",
+    cluster: "alphapro-dev",
+    region: "ap-southeast-1",
+    applied: true,
+    web: { enabled: true, port: 8000, desired: 1, min: 1, max: 10, cpu: 256, memory: 512, spot: true },
+    frontend: { enabled: false, port: 3000, host: "dash-dev.alfapro.ai" },
+    alb: { name: "alphapro-dev-alb", https: true, redirect: false },
+    caches: ["alphapro-dev-valkey", "alphapro-dev-valkey-cache"],
+    db: { id: "alphapro-dev", managed: false, note: "external Aurora, shared" },
+    bucket: "squatwolf-alphapro-dev-files",
+    stores: {
+      uae: { name: "AlphaPro UAE",    bus: "squatwolf.com-dev-alphapro",    channel: 1, app: 1,
+             workers: { orders: false, products: false, inventory: false } },
+      kwt: { name: "AlphaPro Kuwait", bus: "kw.squatwolf.com-dev-alphapro", channel: 3, app: 4,
+             workers: { orders: false, products: false, inventory: false } },
+      ksa: { name: "AlphaPro KSA",    bus: "sa.squatwolf.com-dev-alphapro", channel: 2, app: 9,
+             workers: { orders: false, products: false, inventory: false } },
+      qat: { name: "AlphaPro Qatar",  bus: "qa.squatwolf.com-dev-alphapro", channel: 4, app: 6,
+             workers: { orders: false, products: false, inventory: false } },
+    },
+  },
+  prod: {
+    label: "prod",
+    cluster: "alphapro-prod",
+    region: "ap-southeast-1",
+    applied: false,
+    appliedNote: "never applied — no Terraform state exists for this environment",
+    web: { enabled: true, port: 8000, desired: 2, min: 2, max: 20, cpu: 512, memory: 1024, spot: false },
+    frontend: { enabled: false, port: 3000, host: "app.alfapro.ai" },
+    alb: { name: "alphapro-prod-alb", https: true, redirect: true },
+    caches: ["alphapro-prod-valkey", "alphapro-prod-valkey-cache"],
+    db: { id: "alphapro-prod", managed: true, note: "Terraform would CREATE a new RDS instance" },
+    bucket: "squatwolf-alphapro-prod-files",
+    stores: {
+      uae: { name: "AlphaPro UAE",    bus: "squatwolf.com-alphapro", workers: {} },
+      ksa: { name: "AlphaPro KSA",    bus: null, workers: {} },
+      kwt: { name: "AlphaPro Kuwait", bus: null, workers: {} },
+      qat: { name: "AlphaPro Qatar",  bus: null, workers: {} },
+    },
+  },
+};
+
+/* Served by oms_status.py itself, so the feed is same-origin: no CORS, no
+   mixed content, no private-network preflight. The absolute fallback only
+   matters if this file is opened straight off disk as file://. */
+const DEFAULT_ENDPOINT = location.protocol.startsWith("http")
+  ? new URL("status", location.origin + "/").href
+  : "http://127.0.0.1:8787/status";
+
+/* ------------------------------------------------------------------ state */
+
+const state = {
+  endpoint: readStore("oms.endpoint") || DEFAULT_ENDPOINT,
+  interval: Number(readStore("oms.interval") ?? 10000),
+  env: readStore("oms.env") || "dev",
+  showAllAlarms: readStore("oms.alarms") === "all",
+  paused: false,
+  data: null,
+  lastOk: null,
+  error: null,
+  inflight: false,
+};
+
+function readStore(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function writeStore(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } }
+
+/* ------------------------------------------------------------- derivation */
+
+function liveEnv(envKey) {
+  if (!state.data) return null;
+  return state.data.environments.find(e => e.env === envKey) || null;
+}
+
+function svcState(live) {
+  if (!live) return "unknown";
+  if (live.desired === 0) return live.running === 0 ? "off" : "warn";
+  if (live.running === 0) return "crit";
+  if (live.running < live.desired) return "warn";
+  if (live.rollout && live.rollout !== "COMPLETED") return "warn";
+  return "ok";
+}
+
+function svcLabel(live) {
+  if (!live) return "no data";
+  if (live.desired === 0) return "stopped";
+  if (live.running === 0) return "down";
+  if (live.running < live.desired) return "partial";
+  if (live.rollout === "IN_PROGRESS") return "deploying";
+  if (live.rollout === "FAILED") return "rollout failed";
+  return "running";
+}
+
+/** Expected services for an environment, merged with whatever is live. */
+function buildServices(envKey) {
+  const cfg = CONFIG[envKey];
+  const live = liveEnv(envKey);
+  const byName = new Map((live?.services || []).map(s => [s.name, s]));
+  const c = cfg.cluster;
+  const out = { platform: [], consumers: {}, workers: {} };
+  const claimed = new Set();
+
+  const take = (name) => { claimed.add(name); return byName.get(name) || null; };
+
+  if (cfg.web.enabled) {
+    out.platform.push({
+      name: `${c}-web`, role: "API + migrations",
+      detail: `port ${cfg.web.port} · ${cfg.web.cpu}/${cfg.web.memory} · scales ${cfg.web.min}–${cfg.web.max}`,
+      live: take(`${c}-web`),
+    });
+  }
+  if (cfg.frontend.enabled) {
+    out.platform.push({
+      name: `${c}-frontend`, role: "SPA",
+      detail: `port ${cfg.frontend.port} · host ${cfg.frontend.host}`,
+      live: take(`${c}-frontend`),
+    });
+  } else {
+    out.platform.push({
+      name: `${c}-frontend`, role: "SPA",
+      detail: `disabled — frontend_container_image is empty`,
+      disabled: true, live: take(`${c}-frontend`),
+    });
+  }
+
+  for (const sid of Object.keys(cfg.stores)) {
+    out.consumers[sid] = {};
+    out.workers[sid] = {};
+    for (const q of QUEUE_TYPES) {
+      out.consumers[sid][q.key] = take(`${c}-${sid}-${q.key}-consumer`);
+      const wantWorker = !!(cfg.stores[sid].workers || {})[q.key];
+      out.workers[sid][q.key] = { enabled: wantWorker, live: take(`${c}-${sid}-${q.key}-worker`) };
+    }
+  }
+
+  out.drift = (live?.services || []).filter(s => !claimed.has(s.name));
+  return out;
+}
+
+function queueIndex(envKey) {
+  const live = liveEnv(envKey);
+  const idx = {};
+  for (const q of live?.queues || []) {
+    if (!q.store) continue;
+    idx[q.store] ??= {};
+    idx[q.store][q.type] ??= {};
+    idx[q.store][q.type][q.dlq ? "dlq" : "main"] = q;
+  }
+  return idx;
+}
+
+/* ----------------------------------------------------------------- render */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, ch =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+function render() {
+  const envKey = state.env in CONFIG ? state.env : "dev";
+  const cfg = CONFIG[envKey];
+  const live = liveEnv(envKey);
+  const svcs = buildServices(envKey);
+  const queues = queueIndex(envKey);
+
+  renderLink();
+  renderTabs(envKey);
+  renderCounters(envKey, cfg, live, svcs, queues);
+  renderConnect(envKey, cfg, live);
+  renderPlatform(cfg, live, svcs);
+  renderInfra(cfg, live);
+  renderStores(cfg, live, svcs, queues);
+  renderAlarms(live);
+  renderDrift(svcs);
+
+  $("brandMeta").textContent =
+    `${live ? state.data.region : cfg.region}${state.data?.account ? " · " + state.data.account : ""}`;
+}
+
+function renderLink() {
+  const el = $("link");
+  const txt = $("linkText");
+  if (state.error) {
+    el.dataset.link = "down";
+    txt.textContent = "feed offline";
+  } else if (!state.data) {
+    el.dataset.link = "down";
+    txt.textContent = state.inflight ? "connecting…" : "not connected";
+  } else {
+    const age = (Date.now() - state.lastOk) / 1000;
+    const stale = age > Math.max(30, (state.interval || 30000) / 1000 * 3);
+    el.dataset.link = stale ? "stale" : "live";
+    txt.textContent = state.paused
+      ? `paused · ${fmtAge(age)} old`
+      : `live · ${fmtAge(age)} ago · ${state.data.duration_ms}ms`;
+  }
+}
+
+function fmtAge(sec) {
+  if (sec < 60) return `${Math.max(0, Math.round(sec))}s`;
+  if (sec < 3600) return `${Math.round(sec / 60)}m`;
+  return `${Math.round(sec / 3600)}h`;
+}
+
+function renderTabs(envKey) {
+  $("tabs").innerHTML = Object.keys(CONFIG).map(k => {
+    const live = liveEnv(k);
+    let dot = "unknown";
+    if (live) {
+      const bad = (live.services || []).filter(s => s.desired > 0 && s.running < s.desired);
+      const firing = (live.alarms || []).filter(a => a.state === "ALARM");
+      dot = bad.length ? "crit" : firing.length ? "warn" : "ok";
+    }
+    return `<button class="tab" role="tab" data-env="${k}" aria-selected="${k === envKey}">
+      <span class="dot" data-state="${dot}"></span>${esc(CONFIG[k].label)}</button>`;
+  }).join("");
+
+  for (const b of $("tabs").querySelectorAll(".tab")) {
+    b.onclick = () => { state.env = b.dataset.env; writeStore("oms.env", state.env); render(); };
+  }
+}
+
+function renderCounters(envKey, cfg, live, svcs, queues) {
+  const all = live?.services || [];
+  const wanted = all.filter(s => s.desired > 0);
+  const healthy = wanted.filter(s => s.running >= s.desired);
+  const tasks = all.reduce((n, s) => n + s.running, 0);
+
+  let backlog = 0, dlq = 0, inflight = 0;
+  for (const s of Object.keys(queues)) {
+    for (const t of Object.keys(queues[s])) {
+      backlog += queues[s][t].main?.visible || 0;
+      inflight += queues[s][t].main?.in_flight || 0;
+      dlq += queues[s][t].dlq?.visible || 0;
+    }
+  }
+
+  const firing = (live?.alarms || []).filter(a => a.state === "ALARM");
+  const noData = (live?.alarms || []).filter(a => a.state === "INSUFFICIENT_DATA");
+
+  const workersOn = Object.values(svcs.workers)
+    .flatMap(o => Object.values(o)).filter(w => w.enabled).length;
+
+  const tile = (label, value, sub, st) => `
+    <div class="counter" data-state="${st}">
+      <dt>${esc(label)}</dt>
+      <dd>${value}${sub ? `<small> ${esc(sub)}</small>` : ""}</dd>
+    </div>`;
+
+  if (!live) {
+    $("counters").innerHTML =
+      tile("Services configured",
+           svcs.platform.filter(p => !p.disabled).length
+             + Object.keys(cfg.stores).length * 3 + workersOn, "expected", "off") +
+      tile("Stores", Object.keys(cfg.stores).length, "", "off") +
+      tile("Workers enabled", workersOn, `of ${Object.keys(cfg.stores).length * 3}`, "off") +
+      tile("Queues", Object.keys(cfg.stores).length * 3, "+ DLQs", "off") +
+      tile("Live data", "—", cfg.applied ? "feed offline" : "not deployed", "off");
+    return;
+  }
+
+  $("counters").innerHTML =
+    tile("Services up", `${healthy.length}<small>/${wanted.length}</small>`,
+         `${all.length - wanted.length} stopped`,
+         healthy.length === wanted.length ? "ok" : "crit") +
+    tile("Tasks running", tasks, "", tasks ? "ok" : "warn") +
+    tile("Queue backlog", backlog, inflight ? `${inflight} in flight` : "", backlog > 500 ? "warn" : backlog ? "ok" : "off") +
+    tile("Dead letters", dlq, "", dlq ? "crit" : "ok") +
+    tile("Alarms firing", firing.length, noData.length ? `${noData.length} no data` : "",
+         firing.length ? "crit" : noData.length ? "warn" : "ok");
+}
+
+function renderConnect(envKey, cfg, live) {
+  const box = $("connect");
+  const show = !state.data || !live;
+  box.hidden = !show;
+  if (!show) return;
+
+  $("epLabel").textContent = state.endpoint.replace(/^https?:\/\//, "").replace(/\/status$/, "");
+
+  if (!state.data) {
+    $("connectWhy").innerHTML = `Everything below is read from the Terraform configuration — what
+      <em>should</em> be running. Start the local feed to see what actually is.`;
+  } else {
+    $("connectWhy").innerHTML = cfg.applied
+      ? `The feed is connected but reported no <code>${esc(cfg.cluster)}</code> cluster.
+         Check the profile and region the feed is running against.`
+      : `<b>${esc(cfg.label)} has never been applied</b> — ${esc(cfg.appliedNote || "")}.
+         The layout below is what <code>terraform apply</code> would create.`;
+  }
+}
+
+function renderPlatform(cfg, live, svcs) {
+  $("platformNote").textContent = cfg.applied
+    ? `cluster ${cfg.cluster}`
+    : `cluster ${cfg.cluster} — not deployed`;
+
+  $("platform").innerHTML = svcs.platform.map(p => {
+    const st = p.disabled && !p.live ? "off" : svcState(p.live);
+    const l = p.live;
+    return `<div class="row" data-state="${st}">
+      <span class="stripe"></span>
+      <div class="row-main">
+        <div class="row-name">${esc(p.name)}</div>
+        <div class="row-sub"><b>${esc(p.role)}</b> · ${esc(p.detail)}${
+          l?.task_definition ? ` · <b>${esc(l.task_definition)}</b>` : ""}</div>
+      </div>
+      <div class="row-right">
+        ${l ? `<span class="count">${l.running}<i>/${l.desired}</i></span>` : ""}
+        ${taskPills(l)}
+        <span class="pill" data-state="${pillState(st)}">${esc(p.disabled && !l ? "disabled" : svcLabel(l))}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  // ALB target groups read as part of the platform, not as separate objects.
+  const lb = (live?.load_balancers || [])[0];
+  if (lb) {
+    $("platform").insertAdjacentHTML("beforeend", (lb.target_groups || []).map(tg => {
+      const bad = tg.targets.filter(t => t.state !== "healthy");
+      const st = !tg.targets.length ? "off" : bad.length ? (bad.length === tg.targets.length ? "crit" : "warn") : "ok";
+      return `<div class="row" data-state="${st}">
+        <span class="stripe"></span>
+        <div class="row-main">
+          <div class="row-name">${esc(tg.name)}</div>
+          <div class="row-sub">target group · port ${esc(tg.port)} · health <b>${esc(tg.health_path || "—")}</b></div>
+        </div>
+        <div class="row-right">
+          <span class="count">${tg.targets.length - bad.length}<i>/${tg.targets.length}</i></span>
+          ${tg.targets.slice(0, 4).map(t =>
+            `<span class="pill" data-state="${t.state === "healthy" ? "ok" : t.state === "unhealthy" ? "crit" : "warn"}"
+             title="${esc(t.description || t.state)}">${esc(t.id)}:${esc(t.port)}</span>`).join("")}
+          ${tg.targets.length ? "" : `<span class="pill">no targets</span>`}
+        </div>
+      </div>`;
+    }).join(""));
+  }
+}
+
+function pillState(st) {
+  return st === "ok" ? "ok" : st === "warn" ? "warn" : st === "crit" ? "crit" : "";
+}
+
+function taskPills(l) {
+  if (!l || !l.tasks?.length) return "";
+  return l.tasks.slice(0, 4).map(t => {
+    const h = (t.health || "").toUpperCase();
+    const st = t.last_status !== "RUNNING" ? "warn"
+             : h === "HEALTHY" ? "ok" : h === "UNHEALTHY" ? "crit" : "";
+    const label = t.last_status !== "RUNNING" ? t.last_status.toLowerCase()
+                : h === "UNKNOWN" || !h ? t.id : h.toLowerCase();
+    return `<span class="pill" data-state="${st}" title="${esc(t.id)} · ${esc(t.az || "")} · ${esc(t.last_status)}">${esc(label)}</span>`;
+  }).join("");
+}
+
+function renderInfra(cfg, live) {
+  const lb = (live?.load_balancers || [])[0];
+  const items = [];
+
+  items.push(["Load balancer", lb ? `${lb.name} · ${lb.state}` : cfg.alb.name]);
+  items.push(["ALB hostname", lb?.dns || "—"]);
+  items.push(["Listeners", lb
+    ? lb.listeners.map(l => `${l.protocol}:${l.port}${l.rules.length ? ` (+${l.rules.length})` : ""}`).join("  ")
+    : `HTTP:80${cfg.alb.https ? "  HTTPS:443" : ""}${cfg.alb.redirect ? "  80→443" : ""}`]);
+
+  for (const c of cfg.caches) {
+    const l = (live?.caches || []).find(x => x.id === c);
+    items.push([c.endsWith("-cache") ? "Valkey cache" : "Valkey broker",
+      l ? `${l.status} · ${l.version} · ${l.nodes} node${l.nodes === 1 ? "" : "s"}` : c]);
+  }
+
+  const db = (live?.databases || [])[0];
+  items.push(["Database", db ? `${db.id} · ${db.status} · ${db.engine}` : `${cfg.db.id} — ${cfg.db.note}`]);
+
+  const nat = (live?.nat || []).flatMap(n => n.ips).filter(Boolean);
+  items.push(["NAT egress IP", nat.length ? nat.join(", ") : "—"]);
+  items.push(["Asset bucket", cfg.bucket]);
+
+  $("infra").innerHTML = items.map(([k, v]) =>
+    `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+}
+
+function renderStores(cfg, live, svcs, queues) {
+  $("stores").innerHTML = Object.entries(cfg.stores).map(([sid, s]) => {
+    const rows = QUEUE_TYPES.map(q => {
+      const con = svcs.consumers[sid][q.key];
+      const wrk = svcs.workers[sid][q.key];
+      const main = queues[sid]?.[q.key]?.main;
+      const dl = queues[sid]?.[q.key]?.dlq;
+
+      const conSt = svcState(con);
+      const num = (v, cls) => v == null ? `<span class="zero">—</span>`
+        : v === 0 ? `<span class="zero">0</span>` : `<span class="${cls}">${v}</span>`;
+
+      let worker;
+      if (wrk.live) {
+        worker = `<span class="pill" data-state="${pillState(svcState(wrk.live))}">${
+          wrk.live.running}/${wrk.live.desired}</span>`;
+      } else if (wrk.enabled) {
+        worker = `<span class="pill" data-state="warn">pending</span>`;
+      } else {
+        worker = `<span class="pill">off</span>`;
+      }
+
+      return `<tr>
+        <td class="qtype" data-fifo="${q.fifo}">${esc(q.key)}</td>
+        <td><span class="pill" data-state="${pillState(conSt)}">${
+          con ? `${con.running}/${con.desired}` : (live ? "missing" : "—")}</span></td>
+        <td class="num">${num(main?.visible, (main?.visible || 0) > 500 ? "busy" : "")}</td>
+        <td class="num">${num(main?.in_flight, "")}</td>
+        <td class="num">${num(dl?.visible, "hot")}</td>
+        <td>${worker}</td>
+      </tr>`;
+    }).join("");
+
+    const busOk = !!s.bus;
+    return `<article class="panel">
+      <div class="store-head">
+        <span class="store-key">${esc(sid)}</span>
+        <h3>${esc(s.name)}</h3>
+        <div class="store-meta">
+          ${busOk ? esc(s.bus) : `<span style="color:var(--crit)">event bus not configured</span>`}
+          ${s.channel ? `<br>channel ${esc(s.channel)} · app ${esc(s.app)}` : ""}
+        </div>
+      </div>
+      <div class="tw">
+        <table class="grid">
+          <thead><tr>
+            <th>Stream</th><th>Consumer</th>
+            <th class="num">Queue</th><th class="num">Flight</th><th class="num">DLQ</th>
+            <th>Worker</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function renderAlarms(live) {
+  const all = live?.alarms || [];
+  const shown = state.showAllAlarms ? all : all.filter(a => a.state !== "OK");
+
+  $("alarmToggle").textContent = state.showAllAlarms ? "only firing" : `show all (${all.length})`;
+
+  const silent = all.some(a => !a.has_actions || a.actions_enabled === false);
+  $("alarmNote").textContent = all.length
+    ? `${all.filter(a => a.state === "ALARM").length} firing of ${all.length}${silent ? " · some have no action" : ""}`
+    : live ? "none found" : "needs the live feed";
+
+  if (!shown.length) {
+    $("alarms").innerHTML = `<div class="empty">${
+      live ? (all.length ? "Every alarm is OK." : "No alarms returned for this cluster.")
+           : "Alarm state comes from CloudWatch — start the feed to see it."}</div>`;
+    return;
+  }
+
+  $("alarms").innerHTML = `<table class="grid">
+    <thead><tr><th>Alarm</th><th>State</th><th>Since</th><th>Reason</th></tr></thead>
+    <tbody>${shown.map(a => {
+      const st = a.state === "ALARM" ? "crit" : a.state === "OK" ? "ok" : "warn";
+      return `<tr>
+        <td class="alarm-name">${esc(a.name)}</td>
+        <td><span class="pill" data-state="${st}">${esc(a.state)}</span></td>
+        <td class="num">${esc(a.since ? fmtAge((Date.now() - Date.parse(a.since)) / 1000) : "—")}</td>
+        <td class="alarm-reason">${esc(a.reason || "")}</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+}
+
+function renderDrift(svcs) {
+  const rows = svcs.drift || [];
+  $("driftSec").hidden = !rows.length;
+  if (!rows.length) return;
+
+  $("drift").innerHTML = rows.map(s => `
+    <div class="row" data-state="${svcState(s)}">
+      <span class="stripe"></span>
+      <div class="row-main">
+        <div class="row-name">${esc(s.name)}</div>
+        <div class="row-sub">${esc(s.task_definition || "")}</div>
+      </div>
+      <div class="row-right">
+        <span class="count">${s.running}<i>/${s.desired}</i></span>
+        <span class="pill" data-state="warn">untracked</span>
+      </div>
+    </div>`).join("");
+}
+
+/* ------------------------------------------------------------------- poll */
+
+let timer = null;
+
+async function poll(force) {
+  if (state.inflight) return;
+  state.inflight = true;
+  renderLink();
+
+  const ctl = new AbortController();
+  const kill = setTimeout(() => ctl.abort(), 15000);
+
+  try {
+    const url = state.endpoint + (force ? (state.endpoint.includes("?") ? "&" : "?") + "force=1" : "");
+    const res = await fetch(url, { signal: ctl.signal, cache: "no-store" });
+    if (!res.ok) throw new Error(`feed returned ${res.status}`);
+    state.data = await res.json();
+    state.lastOk = Date.now();
+    state.error = null;
+  } catch (err) {
+    state.error = err.name === "AbortError" ? "feed timed out" : String(err.message || err);
+  } finally {
+    clearTimeout(kill);
+    state.inflight = false;
+    render();
+  }
+}
+
+function schedule() {
+  if (timer) clearInterval(timer);
+  timer = null;
+  if (state.interval > 0 && !state.paused) {
+    timer = setInterval(() => poll(false), state.interval);
+  }
+}
+
+/* --------------------------------------------------------------- controls */
+
+$("interval").value = String(state.interval);
+$("endpoint").value = state.endpoint;
+$("pause").textContent = state.paused ? "resume" : "pause";
+
+$("interval").onchange = e => {
+  state.interval = Number(e.target.value);
+  writeStore("oms.interval", String(state.interval));
+  schedule();
+};
+
+$("pause").onclick = () => {
+  state.paused = !state.paused;
+  $("pause").textContent = state.paused ? "resume" : "pause";
+  schedule();
+  render();
+};
+
+$("now").onclick = () => poll(true);
+
+$("saveEp").onclick = () => {
+  state.endpoint = $("endpoint").value.trim() || DEFAULT_ENDPOINT;
+  writeStore("oms.endpoint", state.endpoint);
+  poll(true);
+};
+$("endpoint").addEventListener("keydown", e => { if (e.key === "Enter") $("saveEp").click(); });
+
+/* Follows the OS until you say otherwise, then stays put. */
+const savedTheme = readStore("oms.theme");
+if (savedTheme === "dark" || savedTheme === "light") {
+  document.documentElement.dataset.theme = savedTheme;
+}
+$("theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme;
+  const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  writeStore("oms.theme", next);
+};
+
+$("alarmToggle").onclick = () => {
+  state.showAllAlarms = !state.showAllAlarms;
+  writeStore("oms.alarms", state.showAllAlarms ? "all" : "firing");
+  render();
+};
+
+/* Keep the age readout honest between polls. */
+setInterval(renderLink, 1000);
+
+render();
+poll(false);
+schedule();
+</script>
+</html>

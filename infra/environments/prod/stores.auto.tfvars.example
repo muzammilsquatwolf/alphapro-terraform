@@ -1,0 +1,129 @@
+# Stores in prod — one block per store. Auto-loaded by Terraform (no
+# -var-file flag) because of the .auto.tfvars suffix; see infra/README.md.
+#
+# Each store gets its OWN event_bus. That isolation is the point: a store's
+# 3 EventBridge rules (inventory/orders/products) all attach to its own bus
+# and separate from each other by X-Shopify-Topic prefix, so no store ever
+# sees another store's webhooks.
+#
+# Terraform does NOT create these buses. Per store: install the Shopify
+# EventBridge app, then associate the resulting partner event source with a
+# bus in the AWS console. Each bus is region-scoped — it must exist in
+# TF_VAR_aws_region (ap-southeast-1) or that store's rules fail to create.
+#
+# app_url is NOT here — it's one shared value per environment
+# (TF_VAR_app_url), since every consumer calls back into the same web app.
+#
+# All four buses are filled in. The old 347762098177/integration-layer-*-prod
+# names are STALE (different partner account, us-east-1) — never reuse them.
+# Adding a store means associating its partner event source in ap-southeast-1
+# first, then pasting the real name here.
+
+# --- Worker channel and app ids -----------------------------------------
+# The --channel-id / --app-id values below are COPIED FROM DEV and are almost
+# certainly wrong for prod. They index rows in the application's own channel
+# table, and prod runs a different database, so its ids are assigned
+# independently.
+#
+# Every worker here is disabled, so these values reach nothing: locals.
+# store_workers filters on `enabled`, meaning a disabled worker produces no
+# task definition and no service at all. They are placeholders that keep the
+# file's shape complete.
+#
+# BEFORE ENABLING ANY WORKER: read the prod channel table and replace both ids
+# for that store. A worker pointed at the wrong channel syncs one store's data
+# under another store's identity, and nothing in the infrastructure catches it.
+#
+# For reference, dev's mapping (channel_id, name, channel_app):
+#   1, SQUATWOLF Global, 1      3, SQUATWOLF Kuwait, 4
+#   2, SQUATWOLF KSA,    9      4, SQUATWOLF Qatar,  6
+
+stores = {
+  # Four stores, four separate buses, each named after its own domain plus
+  # "-alphapro"; dev's siblings carry "-dev-alphapro" instead. The partner
+  # segment (421054021633) identifies the Shopify app rather than the store,
+  # which is why it is the same across all four here and all four in dev.
+  uae = {
+    store_name = "AlphaPro UAE"
+    event_bus  = "aws.partner/shopify.com/421054021633/squatwolf.com-alphapro"
+
+    # One ECS service per entry. args is everything after
+    # `python -m app.cli.main`; per-store values like --channel-id and
+    # --app-id live here, not in the module. enabled defaults to true, so
+    # setting it false is how you pause one without deleting the config.
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=1", "--app-id=1", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=1", "--app-id=1", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=1", "--app-id=1", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  ksa = {
+    store_name = "AlphaPro KSA"
+    event_bus  = "aws.partner/shopify.com/421054021633/sa.squatwolf.com-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=2", "--app-id=9", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=2", "--app-id=9", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=2", "--app-id=9", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  kwt = {
+    store_name = "AlphaPro Kuwait"
+    event_bus  = "aws.partner/shopify.com/421054021633/kw.squatwolf.com-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=3", "--app-id=4", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=3", "--app-id=4", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=3", "--app-id=4", "--limit=10", "--full"]
+      }
+    }
+  }
+
+  qat = {
+    store_name = "AlphaPro Qatar"
+    event_bus  = "aws.partner/shopify.com/421054021633/qa.squatwolf.com-alphapro"
+
+    workers = {
+      orders = {
+        enabled = false
+        args    = ["shopify", "sync", "orders", "--channel-id=4", "--app-id=6", "--limit=2", "--full"]
+      }
+      products = {
+        enabled = false
+        args    = ["shopify", "sync", "products", "--channel-id=4", "--app-id=6", "--limit=10", "--full"]
+      }
+      inventory = {
+        enabled = false
+        args    = ["shopify", "sync", "inventory", "--channel-id=4", "--app-id=6", "--limit=10", "--full"]
+      }
+    }
+  }
+}

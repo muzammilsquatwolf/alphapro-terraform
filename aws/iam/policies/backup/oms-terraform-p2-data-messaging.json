@@ -1,0 +1,56 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "RDS",
+            "Effect": "Allow",
+            "Action": [
+                "rds:*DBInstance*",
+                "rds:*DBSubnetGroup*",
+                "rds:*DBParameterGroup*",
+                "rds:DescribeDBParameters",
+                "rds:AddTagsToResource",
+                "rds:RemoveTagsFromResource",
+                "rds:ListTagsForResource"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ElastiCache",
+            "Effect": "Allow",
+            "Action": [
+                "elasticache:*ReplicationGroup*",
+                "elasticache:*CacheSubnetGroup*",
+                "elasticache:DescribeCacheClusters",
+                "elasticache:AddTagsToResource",
+                "elasticache:RemoveTagsFromResource",
+                "elasticache:ListTagsForResource"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "SQS",
+            "Effect": "Allow",
+            "Action": "sqs:*",
+            "Resource": "*"
+        },
+        {
+            "Sid": "EventBridge",
+            "Effect": "Allow",
+            "Action": "events:*",
+            "Resource": "*"
+        },
+        {
+            "Sid": "SNS",
+            "Effect": "Allow",
+            "Action": "sns:*",
+            "Resource": "*"
+        },
+        {
+            "Sid": "SecretsManager",
+            "Effect": "Allow",
+            "Action": "secretsmanager:*",
+            "Resource": "arn:aws:secretsmanager:*:330929085533:secret:alphapro/*"
+        }
+    ]
+}

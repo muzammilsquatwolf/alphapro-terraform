@@ -1,0 +1,15 @@
+# Remote state backend config for the PROD environment.
+# Copy to backend.hcl, fill in, uncomment the `backend "s3" {}` block in
+# versions.tf, then run:  ./tf.sh init -backend-config=backend.hcl
+#
+# This bucket is prod-only — dev uses its own separate bucket (see
+# environments/dev/backend.hcl.example), so a mistake in one environment's
+# state can't touch the other's. Neither bucket exists yet; create both (plus
+# the shared lock table) before the first `init -backend-config`.
+bucket         = "squatwolf-alphapro-prod-tfstate"
+key            = "alphapro/terraform.tfstate"
+region         = "ap-southeast-1"
+# Native S3 locking (conditional writes) — replaces the deprecated
+# dynamodb_table parameter. Requires Terraform >= 1.10.
+use_lockfile   = true
+encrypt        = true
