@@ -93,9 +93,6 @@ resource "aws_ecs_task_definition" "web" {
         [for k in sort(keys(var.web_env)) : { name = k, value = var.web_env[k] }]
       )
       secrets = [
-        # Composite URL alongside the components — see the consumer task's
-        # secrets block for the caveat about special characters in the password.
-        { name = "DATABASE_URL", valueFrom = "${local.database_secret_arn}:DATABASE_URL::" },
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
         { name = "DB_DATABASE", valueFrom = "${local.database_secret_arn}:dbname::" },
         { name = "DOCS_PASSWORD", valueFrom = "${aws_secretsmanager_secret.app.arn}:docs_password::" },
@@ -240,12 +237,6 @@ resource "aws_ecs_task_definition" "consumer" {
       ]
       # Exactly the same keys the web task reads, from the same secret.
       secrets = [
-        # Composite URL alongside the components. Worth knowing: a URL is
-        # position-sensitive in a way the parts are not, so a password
-        # containing @ : / ? # corrupts it while leaving DB_PASSWORD fine. If a
-        # connection works via the components and not via this, that is the
-        # first thing to check.
-        { name = "DATABASE_URL", valueFrom = "${local.database_secret_arn}:DATABASE_URL::" },
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
         { name = "DB_DATABASE", valueFrom = "${local.database_secret_arn}:dbname::" },
         { name = "DB_PASSWORD", valueFrom = "${local.database_secret_arn}:password::" },

@@ -70,10 +70,6 @@ resource "aws_ecs_task_definition" "worker" {
       ]
 
       secrets = [
-        # Composite URL. The six DB_* keys below carry the same connection in
-        # parts; both are injected so the application can read whichever it
-        # expects without the two ever disagreeing — they come from one secret.
-        { name = "DATABASE_URL", valueFrom = "${local.database_secret_arn}:DATABASE_URL::" },
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
         { name = "DB_DATABASE", valueFrom = "${local.database_secret_arn}:dbname::" },
         { name = "DB_PASSWORD", valueFrom = "${local.database_secret_arn}:password::" },
