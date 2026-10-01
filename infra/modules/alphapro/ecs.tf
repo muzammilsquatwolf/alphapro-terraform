@@ -75,7 +75,7 @@ resource "aws_ecs_task_definition" "web" {
         # stopTimeout before a hard SIGKILL. `uv run` itself execs into its
         # target process on Unix, so this chains cleanly through to uvicorn.
         "echo '>>> Running alembic migrations...' && uv run alembic upgrade head && echo '>>> Migrations complete. Starting uvicorn server...' && exec uv run uvicorn main:app --host 0.0.0.0 --port $${PORT:-8001}"
-        #"echo '>>>Starting uvicorn server...' && exec uv run uvicorn main:app --host 0.0.0.0 --port $${PORT:-8001}"
+        #"echo '>>>Starting uvicorn server....' && exec uv run uvicorn main:app --host 0.0.0.0 --port $${PORT:-8001}"
       ]
       environment = concat([
         { name = "AWS_REGION", value = var.aws_region },
@@ -87,7 +87,7 @@ resource "aws_ecs_task_definition" "web" {
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
         { name = "PORT", value = tostring(var.web_port) },
-        { name = "S3_BUCKET_NAME", value = aws_s3_bucket.assets.id },
+        { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
         ],
         # Application-level settings from var.web_env, sorted for a stable diff.
         [for k in sort(keys(var.web_env)) : { name = k, value = var.web_env[k] }]
@@ -265,7 +265,7 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "SHOPIFY_SQS_STRICT_HMAC", value = var.shopify_sqs_strict_hmac },
         { name = "STORE_ID", value = each.value.store_id },
         { name = "STORE_NAME", value = each.value.store_name },
-        { name = "S3_BUCKET_NAME", value = aws_s3_bucket.assets.id },
+        { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
       ]
       # Exactly the same keys the web task reads, from the same secret.
       secrets = [

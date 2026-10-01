@@ -66,7 +66,7 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "STORE_ID", value = each.value.store_id },
         { name = "STORE_NAME", value = each.value.store_name },
         { name = "WORKER_NAME", value = each.value.worker_name },
-        { name = "S3_BUCKET_NAME", value = aws_s3_bucket.assets.id },
+        { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
       ]
 
       secrets = [
