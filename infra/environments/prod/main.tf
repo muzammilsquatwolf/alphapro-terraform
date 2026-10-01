@@ -39,6 +39,7 @@ module "alphapro" {
   web_min_capacity                   = var.web_min_capacity
   web_max_capacity                   = var.web_max_capacity
   enable_consumers                   = var.enable_consumers
+  consumer_queue_types               = var.consumer_queue_types
   worker_desired_count               = var.worker_desired_count
   consumer_desired_count             = var.consumer_desired_count
   consumer_min_capacity              = var.consumer_min_capacity
@@ -53,6 +54,7 @@ module "alphapro" {
   health_check_timeout               = var.health_check_timeout
   web_health_check_grace_period      = var.web_health_check_grace_period
   container_insights                 = var.container_insights
+  enable_deployment_circuit_breaker  = var.enable_deployment_circuit_breaker
 
   # Stores
   stores                        = var.stores

@@ -91,4 +91,15 @@ locals {
       }
     }
   ]...)
+
+  # Which (store, queue type) pairs actually get a consumer service.
+  #
+  # Deliberately NOT applied to store_queues itself: the SQS queues, DLQs and
+  # EventBridge rules stay in place for every type regardless, so a paused type
+  # keeps accumulating webhooks instead of dropping them on the floor. Only the
+  # compute that drains them is switched off.
+  active_consumers = var.enable_consumers ? {
+    for k, v in local.store_queues : k => v
+    if contains(var.consumer_queue_types, v.queue_type)
+  } : {}
 }

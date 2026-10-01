@@ -159,6 +159,18 @@ resource "aws_ecs_service" "frontend" {
     }
   }
 
+
+  # Abandon a deployment whose tasks keep failing to start, and return to the
+  # last revision that worked. Off leaves the AWS default, which retries
+  # forever.
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
+
   deployment_maximum_percent         = var.deployment_maximum_percent
   deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
   health_check_grace_period_seconds  = var.web_health_check_grace_period

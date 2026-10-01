@@ -136,6 +136,18 @@ resource "aws_ecs_service" "web" {
     }
   }
 
+
+  # Abandon a deployment whose tasks keep failing to start, and return to the
+  # last revision that worked. Off leaves the AWS default, which retries
+  # forever.
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
+
   deployment_maximum_percent         = var.deployment_maximum_percent
   deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
   health_check_grace_period_seconds  = var.web_health_check_grace_period
@@ -191,7 +203,7 @@ resource "aws_ecs_service" "web" {
 ###############################################################################
 
 resource "aws_ecs_task_definition" "consumer" {
-  for_each = var.enable_consumers ? local.store_queues : {}
+  for_each = local.active_consumers
 
   family                   = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-consumer"
   requires_compatibilities = ["FARGATE"]
@@ -258,7 +270,7 @@ resource "aws_ecs_task_definition" "consumer" {
 }
 
 resource "aws_ecs_service" "consumer" {
-  for_each = var.enable_consumers ? local.store_queues : {}
+  for_each = local.active_consumers
 
   name            = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-consumer"
   cluster         = aws_ecs_cluster.this.id
@@ -271,6 +283,18 @@ resource "aws_ecs_service" "consumer" {
       capacity_provider = capacity_provider_strategy.value.capacity_provider
       base              = capacity_provider_strategy.value.base
       weight            = capacity_provider_strategy.value.weight
+    }
+  }
+
+
+  # Abandon a deployment whose tasks keep failing to start, and return to the
+  # last revision that worked. Off leaves the AWS default, which retries
+  # forever.
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
     }
   }
 
@@ -334,7 +358,7 @@ resource "aws_appautoscaling_policy" "web_cpu" {
 }
 
 resource "aws_appautoscaling_target" "consumer" {
-  for_each = var.enable_consumers ? local.store_queues : {}
+  for_each = local.active_consumers
 
   max_capacity       = var.consumer_max_capacity
   min_capacity       = var.consumer_min_capacity
@@ -344,7 +368,7 @@ resource "aws_appautoscaling_target" "consumer" {
 }
 
 resource "aws_appautoscaling_policy" "consumer_cpu" {
-  for_each = var.enable_consumers ? local.store_queues : {}
+  for_each = local.active_consumers
 
   name               = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-cpu"
   policy_type        = "TargetTrackingScaling"

@@ -315,6 +315,30 @@ variable "enable_consumers" {
   default     = true
 }
 
+variable "consumer_queue_types" {
+  description = <<-EOT
+    Which queue types get a consumer service, out of inventory, orders and
+    products. Applies to every store — there is no per-store override, because
+    a store processing a different set of webhooks than its siblings is far more
+    often a mistake than an intention.
+
+    Dropping a type here removes its 4 services (one per store) and their
+    no-running-tasks alarms. It does NOT touch that type's SQS queues, DLQs or
+    EventBridge rules, so webhooks keep arriving and queue up for whenever the
+    consumers come back. Watch the queue retention window if a type stays off
+    for long — messages past it are gone.
+
+    Has no effect at all while enable_consumers is false.
+  EOT
+  type        = list(string)
+  default     = ["inventory", "orders", "products"]
+
+  validation {
+    condition     = length(setsubtract(var.consumer_queue_types, ["inventory", "orders", "products"])) == 0
+    error_message = "consumer_queue_types may only contain: inventory, orders, products."
+  }
+}
+
 variable "worker_desired_count" {
   description = <<-EOT
     Tasks per enabled sync service. 1 is almost always right — a worker is
@@ -436,6 +460,25 @@ variable "container_insights" {
   description = "Enable ECS Container Insights on the cluster."
   type        = bool
   default     = true
+}
+
+variable "enable_deployment_circuit_breaker" {
+  description = <<-EOT
+    Let ECS abandon a rolling deployment whose tasks keep failing to start,
+    and roll the service back to the last revision that reached a steady state.
+
+    Off by default, which is also the AWS default: a deployment then retries
+    forever, so a task definition that can never start (a missing secret key, a
+    container exiting non-zero) leaves the service IN_PROGRESS indefinitely
+    rather than reporting failure.
+
+    Rollback needs a previous successful revision to return to, so on a service's
+    very first deployment it can only fail fast, not recover. It pairs with
+    skip_destroy on the task definitions, which keeps every earlier revision
+    registered and therefore available as a rollback target.
+  EOT
+  type        = bool
+  default     = false
 }
 
 ###############################################################################

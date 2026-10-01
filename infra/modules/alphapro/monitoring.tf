@@ -41,7 +41,7 @@ resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
 
 # Consumer service has no running tasks.
 resource "aws_cloudwatch_metric_alarm" "no_running_tasks" {
-  for_each = var.enable_consumers ? local.store_queues : {}
+  for_each = local.active_consumers
 
   alarm_name          = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-no-running-tasks"
   comparison_operator = "LessThanThreshold"
