@@ -105,6 +105,26 @@ resource "aws_ecs_task_definition" "web" {
         { name = "DB_PORT", valueFrom = "${local.database_secret_arn}:port::" },
         { name = "DB_USERNAME", valueFrom = "${local.database_secret_arn}:username::" },
       ]
+      # Runs INSIDE the container, which is what fills the Health status column
+      # in the console — without it ECS reports UNKNOWN. Separate from, and
+      # complementary to, the ALB target group check: that one proves the task
+      # is reachable from outside, this one proves the process is still
+      # answering. A hung worker thread can pass one and fail the other.
+      #
+      # Python rather than curl deliberately: the image certainly has Python
+      # (it runs uvicorn through it), while slim bases usually ship no curl —
+      # and a health check command that is missing fails every task.
+      # urlopen raises on any non-2xx, so no explicit status comparison.
+      #
+      # startPeriod covers `alembic upgrade head` running before uvicorn binds
+      # the port; failures inside it do not count toward retries.
+      healthCheck = {
+        command     = ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:${var.web_port}${var.health_check_path}',timeout=3)\" || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 120
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -255,6 +275,26 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "DB_PORT", valueFrom = "${local.database_secret_arn}:port::" },
         { name = "DB_USERNAME", valueFrom = "${local.database_secret_arn}:username::" },
       ]
+      # There is no HTTP endpoint to probe here — a consumer is an SQS poller —
+      # so this verifies PID 1 is still the consumer process rather than that
+      # it is doing useful work. `exec` in the command above makes python PID 1,
+      # so this catches a process that died without the container exiting.
+      #
+      # Be clear about the limit: it does NOT detect a consumer that is alive
+      # but stuck, which is the failure that actually costs you. The queue-depth
+      # and DLQ alarms are what catch that. This mainly replaces UNKNOWN with a
+      # real status in the console.
+      #
+      # Upgrade path, if it matters later: have the consumer touch a file each
+      # poll and check its mtime here — then "alive" means "still polling"
+      # rather than "still loaded".
+      healthCheck = {
+        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if 'app.consumers' in open('/proc/1/cmdline').read() else 1)\""]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {

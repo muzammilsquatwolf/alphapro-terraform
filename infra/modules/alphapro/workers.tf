@@ -77,6 +77,18 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "DB_USERNAME", valueFrom = "${local.database_secret_arn}:username::" },
       ]
 
+      # Same shape and same caveat as the consumer check in ecs.tf: PID 1 is the
+      # CLI process thanks to `exec`, so this proves it is loaded, not that the
+      # sync is progressing. A worker is a finite job rather than a loop, so
+      # expect the task to exit cleanly when it finishes — that is success, not
+      # an unhealthy container.
+      healthCheck = {
+        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if 'app.cli.main' in open('/proc/1/cmdline').read() else 1)\""]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
