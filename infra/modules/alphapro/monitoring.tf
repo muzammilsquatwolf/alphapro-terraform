@@ -39,6 +39,33 @@ resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
   tags = local.default_tags
 }
 
+# Same alarm for the Celery broker's DLQ. Not covered by the loop above, which
+# only walks the per-store webhook queues — and an unwatched DLQ is just a
+# place failures go to be forgotten.
+resource "aws_cloudwatch_metric_alarm" "celery_dlq_not_empty" {
+  count = var.enable_celery_queue ? 1 : 0
+
+  alarm_name          = "${local.name_prefix}-celery-dlq-not-empty"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Messages present in the Celery DLQ — a task exhausted its retries"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.celery_dlq[0].name
+  }
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+
+  tags = local.default_tags
+}
+
 # Consumer service has no running tasks.
 resource "aws_cloudwatch_metric_alarm" "no_running_tasks" {
   for_each = local.active_consumers

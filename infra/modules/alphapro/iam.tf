@@ -73,6 +73,8 @@ resource "aws_iam_policy" "ecs_task" {
         Effect = "Allow"
         Action = [
           "sqs:ReceiveMessage",
+          # Celery enqueues onto its own broker queue; the consumers only read.
+          "sqs:SendMessage",
           "sqs:DeleteMessage",
           "sqs:GetQueueAttributes",
           "sqs:GetQueueUrl",

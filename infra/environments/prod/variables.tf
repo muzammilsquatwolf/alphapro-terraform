@@ -448,6 +448,32 @@ variable "sqs_receive_wait_time_seconds" {
   }
 }
 
+variable "enable_celery_queue" {
+  description = <<-EOT
+    Create an SQS queue for Celery and inject its URL into the web, consumer
+    and worker tasks as CELERY_SQS_QUEUE_URLS.
+
+    Separate from the per-store webhook queues, which EventBridge fills and the
+    consumers drain — this one carries the application's own background tasks.
+    Off leaves the variable absent rather than empty, so the application can
+    tell "no SQS broker configured" from "configured and broken".
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "celery_worker_desired_count" {
+  description = "Number of Celery worker tasks. 0 pauses the worker while keeping the service and its task definition in place. Only has an effect when enable_celery_queue is true."
+  type        = number
+  default     = 1
+}
+
+variable "enable_mongodb" {
+  description = "Inject MONGODB_URL into the web, consumer and worker tasks, read from the MONGODB_URL key of this environment's database secret. Off where that key does not exist — a task cannot start without a key it references."
+  type        = bool
+  default     = false
+}
+
 variable "shopify_sqs_strict_hmac" {
   description = "Value for the SHOPIFY_SQS_STRICT_HMAC consumer env var."
   type        = string

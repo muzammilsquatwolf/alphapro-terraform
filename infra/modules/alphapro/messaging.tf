@@ -103,3 +103,61 @@ resource "aws_cloudwatch_event_target" "this" {
     }
   }
 }
+
+###############################################################################
+# Celery broker queue + its dead-letter queue
+#
+# Separate from the per-store webhook queues: those are filled by EventBridge
+# and drained by the consumers, while this one carries the application's own
+# background tasks.
+#
+# FIFO, matching the orders and inventory queues. Two things follow: the name
+# MUST end in .fifo (SQS rejects it otherwise, and kombu keys its FIFO handling
+# off that suffix), and ordering is preserved per message group — so
+# concurrency is bounded by how many distinct group ids the application sends,
+# not by how many workers run. A DLQ matters more here than on a standard
+# queue: a message that keeps failing blocks its whole group behind it, so
+# moving it aside is what lets the rest of that group drain.
+#
+# content_based_deduplication means producers need not supply a dedup id, at
+# the cost of SQS treating two identical payloads within 5 minutes as one.
+# Same trade-off the store queues already make.
+#
+# maxReceiveCount is 5 rather than the store queues' 3: Celery retries a task
+# in-process before the message ever returns to the queue, so a redelivery here
+# represents a whole exhausted retry cycle, not a single failure.
+###############################################################################
+
+resource "aws_sqs_queue" "celery_dlq" {
+  count = var.enable_celery_queue ? 1 : 0
+
+  name                        = "${local.name_prefix}-celery-dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  # Longer than the main queue: a dead letter is something a human needs to
+  # look at, and 4 days is easy to sleep through over a weekend.
+  message_retention_seconds = 1209600 # 14 days
+
+  tags = merge(local.default_tags, { Name = "${local.name_prefix}-celery-dlq.fifo" })
+}
+
+resource "aws_sqs_queue" "celery" {
+  count = var.enable_celery_queue ? 1 : 0
+
+  name                        = "${local.name_prefix}-celery.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  visibility_timeout_seconds = 300
+  message_retention_seconds  = 345600 # 4 days
+  max_message_size           = 262144 # 256 KB
+  receive_wait_time_seconds  = var.sqs_receive_wait_time_seconds
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.celery_dlq[0].arn
+    maxReceiveCount     = 5
+  })
+
+  tags = merge(local.default_tags, { Name = "${local.name_prefix}-celery.fifo" })
+}

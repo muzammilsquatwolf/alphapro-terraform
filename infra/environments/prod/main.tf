@@ -61,6 +61,9 @@ module "alphapro" {
   app_url                       = var.app_url
   shopify_sqs_strict_hmac       = var.shopify_sqs_strict_hmac
   sqs_receive_wait_time_seconds = var.sqs_receive_wait_time_seconds
+  enable_celery_queue           = var.enable_celery_queue
+  celery_worker_desired_count   = var.celery_worker_desired_count
+  enable_mongodb                = var.enable_mongodb
 
   # Database
   db_host                    = var.db_host

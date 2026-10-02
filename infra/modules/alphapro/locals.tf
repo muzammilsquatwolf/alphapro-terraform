@@ -102,4 +102,28 @@ locals {
     for k, v in local.store_queues : k => v
     if contains(var.consumer_queue_types, v.queue_type)
   } : {}
+
+  # Appended to the web, consumer and worker environments. An empty list when
+  # the queue is off, so the variable is absent rather than set to "" — the
+  # application can then tell "no SQS broker" from "broker configured but
+  # broken", which an empty string would hide.
+  celery_queue_env = var.enable_celery_queue ? [
+    # JSON-encoded, not the bare URL. The field is plural and typed as a
+    # collection in the application's pydantic Settings, so pydantic-settings
+    # treats it as a complex value and json.loads() it — a plain URL fails at
+    # "Expecting value: line 1 column 1" before anything else runs.
+    { name = "CELERY_SQS_QUEUE_URLS", value = jsonencode([one(aws_sqs_queue.celery[*].url)]) },
+    # Read off the queue rather than written out by hand. The literal
+    # "alphapro-production-celery.fifo" would silently stop matching the moment
+    # project or environment changes — and a Celery default queue that names a
+    # queue which does not exist fails at publish time, not at boot.
+    { name = "CELERY_DEFAULT_QUEUE", value = one(aws_sqs_queue.celery[*].name) },
+  ] : []
+
+  # Gated because the key is per environment: alphapro/dev/database has no
+  # MONGODB_URL, and a task asking for a key its secret lacks dies at container
+  # start with "did not contain json key" — before the application runs.
+  mongodb_secret = var.enable_mongodb ? [
+    { name = "MONGODB_URL", valueFrom = "${local.database_secret_arn}:MONGODB_URL::" }
+  ] : []
 }

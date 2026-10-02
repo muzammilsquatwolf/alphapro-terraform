@@ -1,35 +1,28 @@
 ###############################################################################
-# Per-store workers — Shopify CLI runs, one ECS service per enabled store.
+# Celery worker — drains the Celery broker queue.
 #
-# Driven entirely from the workers map in var.stores, so switching one on
-# means editing stores.auto.tfvars and nothing else:
+# Distinct from the per-store workers in workers.tf. Those are finite CLI jobs
+# (`shopify sync ...`) that run once and exit; this is a long-lived process that
+# blocks on the broker and never finishes on its own.
 #
-#   uae = {
-#     store_name = "AlphaPro UAE"
-#     event_bus  = "..."
-#     workers = {
-#       orders    = { args = ["shopify", "sync", "orders",    "--channel-id=1", ...] }
-#       products  = { args = ["shopify", "sync", "products",  "--channel-id=1", ...] }
-#       inventory = { enabled = false, args = [...] }
-#     }
-#   }
+# Tied to enable_celery_queue rather than its own switch: a Celery worker with
+# no queue to drain is not a useful thing to leave running. Pause it by setting
+# celery_worker_desired_count to 0, which keeps the service and its task
+# definition in place.
 #
-# args is the full argument list after `python -m app.cli.main`, so each store
-# can pass different channel/app ids, limits and flags without this module
-# knowing what any of them mean.
-#
-# No autoscaling: a worker's throughput is bounded by Shopify's API, not by
-# task CPU, so extra tasks would duplicate work rather than divide it.
+# No autoscaling, matching the per-store workers. Celery's own concurrency
+# setting controls how much a single task processes in parallel, and on a FIFO
+# broker queue throughput is bounded by the number of distinct message groups
+# the application sends — extra tasks past that point idle rather than help.
 ###############################################################################
 
-resource "aws_ecs_task_definition" "worker" {
-  for_each = local.store_workers
+resource "aws_ecs_task_definition" "celery_worker" {
+  count = var.enable_celery_queue ? 1 : 0
 
-  family                   = "${local.name_prefix}-${each.key}-worker"
+  family                   = "${local.name_prefix}-celery-worker"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
 
-  # Retain old revisions for rollback, same as every other task here.
   skip_destroy       = true
   cpu                = var.task_cpu
   memory             = var.task_memory
@@ -43,15 +36,17 @@ resource "aws_ecs_task_definition" "worker" {
 
   container_definitions = jsonencode([
     {
-      name      = "${each.key}-worker"
+      name      = "celery-worker"
       image     = var.container_image
       essential = true
 
-      # `exec` so the CLI replaces the shell as PID 1 and receives SIGTERM
-      # directly on task stop, rather than the signal being swallowed.
+      # `exec` so celery replaces the shell as PID 1 and receives SIGTERM
+      # directly on task stop — that is what lets it finish the task in flight
+      # and stop accepting new ones, instead of the signal being swallowed and
+      # the task hard-killed after stopTimeout.
       command = [
         "sh", "-c",
-        "echo '>>> Starting ${each.value.worker_name} worker for store ${each.value.store_id}...' && exec python -m app.cli.main ${join(" ", each.value.args)}"
+        "echo '>>> Starting Celery worker...' && exec uv run celery -A app.core.celery worker --loglevel=info"
       ]
 
       environment = concat([
@@ -63,9 +58,6 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
-        { name = "STORE_ID", value = each.value.store_id },
-        { name = "STORE_NAME", value = each.value.store_name },
-        { name = "WORKER_NAME", value = each.value.worker_name },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
         ],
         local.celery_queue_env
@@ -81,24 +73,25 @@ resource "aws_ecs_task_definition" "worker" {
         local.mongodb_secret
       )
 
-      # Same shape and same caveat as the consumer check in ecs.tf: PID 1 is the
-      # CLI process thanks to `exec`, so this proves it is loaded, not that the
-      # sync is progressing. A worker is a finite job rather than a loop, so
-      # expect the task to exit cleanly when it finishes — that is success, not
-      # an unhealthy container.
+      # `celery inspect ping` would prove the worker is actually responsive, but
+      # it needs a broker round-trip on every check and fails during a long
+      # task. This settles for proving PID 1 is still the worker process — the
+      # queue-depth and DLQ alarms are what catch a worker that is alive but
+      # not draining.
       healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if 'app.cli.main' in open('/proc/1/cmdline').read() else 1)\""]
+        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if 'celery' in open('/proc/1/cmdline').read() else 1)\""]
         interval    = 30
         timeout     = 5
         retries     = 3
         startPeriod = 60
       }
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
           "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "${each.key}-worker"
+          "awslogs-stream-prefix" = "celery-worker"
         }
       }
     }
@@ -107,13 +100,13 @@ resource "aws_ecs_task_definition" "worker" {
   tags = local.default_tags
 }
 
-resource "aws_ecs_service" "worker" {
-  for_each = local.store_workers
+resource "aws_ecs_service" "celery_worker" {
+  count = var.enable_celery_queue ? 1 : 0
 
-  name            = "${local.name_prefix}-${each.key}-worker"
+  name            = "${local.name_prefix}-celery-worker"
   cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.worker[each.key].arn
-  desired_count   = var.worker_desired_count
+  task_definition = aws_ecs_task_definition.celery_worker[0].arn
+  desired_count   = var.celery_worker_desired_count
 
   dynamic "capacity_provider_strategy" {
     for_each = var.capacity_provider_strategy
@@ -124,10 +117,6 @@ resource "aws_ecs_service" "worker" {
     }
   }
 
-
-  # Abandon a deployment whose tasks keep failing to start, and return to the
-  # last revision that worked. Off leaves the AWS default, which retries
-  # forever.
   dynamic "deployment_circuit_breaker" {
     for_each = var.enable_deployment_circuit_breaker ? [1] : []
     content {
@@ -139,8 +128,7 @@ resource "aws_ecs_service" "worker" {
   deployment_maximum_percent         = var.deployment_maximum_percent
   deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
 
-  # No load_balancer and no health_check_grace_period — nothing routes to a
-  # worker task.
+  # No load_balancer and no health_check_grace_period — nothing routes to it.
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
@@ -148,8 +136,8 @@ resource "aws_ecs_service" "worker" {
     assign_public_ip = false
   }
 
-  # Same database keys as the consumers, so the same ordering requirement —
-  # see aws_ecs_service.web for why the secret's ARN alone is not enough.
+  # The secret must hold a value before a task can start; see
+  # aws_ecs_service.web for the failure this prevents.
   depends_on = [
     aws_ecs_cluster_capacity_providers.this,
     aws_secretsmanager_secret_version.database,
@@ -157,8 +145,6 @@ resource "aws_ecs_service" "worker" {
 
   tags = local.default_tags
 
-  # Consistent with the other services: the running count is an operational
-  # decision (scale to 0 to pause a worker), and Terraform should not reset it.
   lifecycle {
     ignore_changes = [desired_count]
   }

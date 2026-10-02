@@ -90,9 +90,10 @@ resource "aws_ecs_task_definition" "web" {
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
         ],
         # Application-level settings from var.web_env, sorted for a stable diff.
-        [for k in sort(keys(var.web_env)) : { name = k, value = var.web_env[k] }]
+        [for k in sort(keys(var.web_env)) : { name = k, value = var.web_env[k] }],
+        local.celery_queue_env
       )
-      secrets = [
+      secrets = concat([
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
         { name = "DB_DATABASE", valueFrom = "${local.database_secret_arn}:dbname::" },
         { name = "DOCS_PASSWORD", valueFrom = "${aws_secretsmanager_secret.app.arn}:docs_password::" },
@@ -104,7 +105,9 @@ resource "aws_ecs_task_definition" "web" {
         { name = "DB_PASSWORD", valueFrom = "${local.database_secret_arn}:password::" },
         { name = "DB_PORT", valueFrom = "${local.database_secret_arn}:port::" },
         { name = "DB_USERNAME", valueFrom = "${local.database_secret_arn}:username::" },
-      ]
+        ],
+        local.mongodb_secret
+      )
       # Runs INSIDE the container, which is what fills the Health status column
       # in the console — without it ECS reports UNKNOWN. Separate from, and
       # complementary to, the ALB target group check: that one proves the task
@@ -251,7 +254,7 @@ resource "aws_ecs_task_definition" "consumer" {
         "sh", "-c",
         "echo '>>> Starting ${each.value.queue_type} consumer for store ${each.value.store_id}...' && exec python -m app.consumers.${each.value.queue_type}"
       ]
-      environment = [
+      environment = concat([
         { name = "APP_URL", value = each.value.app_url },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "REDIS_URL", value = local.cache_url },
@@ -266,15 +269,19 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "STORE_ID", value = each.value.store_id },
         { name = "STORE_NAME", value = each.value.store_name },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
-      ]
+        ],
+        local.celery_queue_env
+      )
       # Exactly the same keys the web task reads, from the same secret.
-      secrets = [
+      secrets = concat([
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
         { name = "DB_DATABASE", valueFrom = "${local.database_secret_arn}:dbname::" },
         { name = "DB_PASSWORD", valueFrom = "${local.database_secret_arn}:password::" },
         { name = "DB_PORT", valueFrom = "${local.database_secret_arn}:port::" },
         { name = "DB_USERNAME", valueFrom = "${local.database_secret_arn}:username::" },
-      ]
+        ],
+        local.mongodb_secret
+      )
       # There is no HTTP endpoint to probe here — a consumer is an SQS poller —
       # so this verifies PID 1 is still the consumer process rather than that
       # it is doing useful work. `exec` in the command above makes python PID 1,
