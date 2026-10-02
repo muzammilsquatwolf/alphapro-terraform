@@ -205,3 +205,50 @@ resource "aws_security_group_rule" "quicksight_egress_to_db" {
   security_group_id        = aws_security_group.quicksight[0].id
   source_security_group_id = aws_security_group.db.id
 }
+
+###############################################################################
+# DocumentDB
+#
+# The cluster itself is created by hand, like the Aurora one — Terraform owns
+# only the group and the rule that lets the ECS tasks in. Attach this group to
+# the cluster in the console; nothing here can do that for you.
+#
+# Tied to enable_mongodb, the same switch that injects MONGODB_URL, so the
+# group exists exactly where something is configured to use it.
+###############################################################################
+
+resource "aws_security_group" "documentdb" {
+  count = var.enable_mongodb ? 1 : 0
+
+  name_prefix = "${local.name_prefix}-documentdb-"
+  description = "Security group for DocumentDB"
+  vpc_id      = aws_vpc.this.id
+
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.default_tags, { Name = "${local.name_prefix}-documentdb" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Group-to-group, not a CIDR: the rule follows the tasks wherever their ENIs
+# land, so it keeps working if the subnets or task IPs ever change.
+resource "aws_security_group_rule" "documentdb_from_ecs" {
+  count = var.enable_mongodb ? 1 : 0
+
+  type                     = "ingress"
+  description              = "DocumentDB from ECS tasks"
+  from_port                = var.documentdb_port
+  to_port                  = var.documentdb_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.documentdb[0].id
+  source_security_group_id = aws_security_group.ecs.id
+}

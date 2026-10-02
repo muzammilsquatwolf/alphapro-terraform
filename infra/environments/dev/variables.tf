@@ -409,6 +409,12 @@ variable "stores" {
     store_name = string
     event_bus  = string
 
+    # Which queue types get a consumer for THIS store. Null (the default) falls
+    # back to var.consumer_queue_types; an empty list means none. Per-store
+    # because one store can legitimately be live while its siblings are not —
+    # the queues keep filling for all of them either way.
+    consumer_queue_types = optional(list(string))
+
     # Optional workers, keyed by name (orders, products, inventory, ...).
     # Each becomes its own ECS service. args is the full argument list after
     # `python -m app.cli.main`.
@@ -472,6 +478,12 @@ variable "enable_mongodb" {
   description = "Inject MONGODB_URL into the web, consumer and worker tasks, read from the MONGODB_URL key of this environment's database secret. Off where that key does not exist — a task cannot start without a key it references."
   type        = bool
   default     = false
+}
+
+variable "documentdb_port" {
+  description = "Port the DocumentDB cluster listens on. 27017 is the default; it is fixed when the cluster is created, so check the cluster rather than assuming."
+  type        = number
+  default     = 27017
 }
 
 variable "shopify_sqs_strict_hmac" {

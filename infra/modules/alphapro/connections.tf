@@ -12,8 +12,18 @@ locals {
 
   database_url = "postgresql://${var.db_username}:${local.db_password}@${local.db_host}:${local.db_port}/${var.db_name}"
 
-  broker_url = "rediss://${aws_elasticache_replication_group.broker.primary_endpoint_address}:${var.broker_port}/0"
-  cache_url  = "rediss://${aws_elasticache_replication_group.cache.primary_endpoint_address}:${var.cache_port}/0"
+  # Celery talks to SQS, not Redis. No credentials in the URL — kombu falls
+  # through to boto3's default chain, which on Fargate is the task role, and
+  # the region comes from the AWS_REGION the tasks already carry.
+  #
+  # The queue itself is named by CELERY_DEFAULT_QUEUE and reachable through
+  # CELERY_SQS_QUEUE_URLS; see local.celery_queue_env.
+  broker_url = "sqs://"
+
+  # REDIS_URL only — the application's own Redis client, not Celery. No
+  # ssl_cert_reqs: that parameter was Celery's requirement, and Celery no
+  # longer speaks Redis.
+  cache_url = "rediss://${aws_elasticache_replication_group.cache.primary_endpoint_address}:${var.cache_port}/0"
 
   # ARN of the database secret, whether created here or pre-existing.
   database_secret_arn = local.create_database ? one(aws_secretsmanager_secret.database[*].arn) : data.aws_secretsmanager_secret.database[0].arn

@@ -64,6 +64,7 @@ module "alphapro" {
   enable_celery_queue           = var.enable_celery_queue
   celery_worker_desired_count   = var.celery_worker_desired_count
   enable_mongodb                = var.enable_mongodb
+  documentdb_port               = var.documentdb_port
 
   # Database
   db_host                    = var.db_host

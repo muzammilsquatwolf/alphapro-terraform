@@ -90,3 +90,8 @@ output "store_ecs_services" {
     }
   }
 }
+
+output "documentdb_security_group_id" {
+  description = "Security group to attach to the manually-created DocumentDB cluster. Null when enable_mongodb is false."
+  value       = one(aws_security_group.documentdb[*].id)
+}

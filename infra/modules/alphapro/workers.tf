@@ -59,7 +59,6 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "REDIS_URL", value = local.cache_url },
         { name = "CELERY_BROKER_URL", value = local.broker_url },
-        { name = "CELERY_RESULT_BACKEND", value = local.broker_url },
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },

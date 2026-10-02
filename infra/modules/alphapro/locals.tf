@@ -98,9 +98,19 @@ locals {
   # EventBridge rules stay in place for every type regardless, so a paused type
   # keeps accumulating webhooks instead of dropping them on the floor. Only the
   # compute that drains them is switched off.
+  # Per-store list, falling back to the environment-wide one. Written as an
+  # explicit null check rather than coalesce(): coalesce skips empty values, so
+  # a store asking for [] (no consumers at all) would silently inherit the
+  # global list instead.
+  store_consumer_types = {
+    for sid, s in var.stores : sid => (
+      try(s.consumer_queue_types, null) != null ? s.consumer_queue_types : var.consumer_queue_types
+    )
+  }
+
   active_consumers = var.enable_consumers ? {
     for k, v in local.store_queues : k => v
-    if contains(var.consumer_queue_types, v.queue_type)
+    if contains(local.store_consumer_types[v.store_id], v.queue_type)
   } : {}
 
   # Appended to the web, consumer and worker environments. An empty list when
