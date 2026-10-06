@@ -1,13 +1,18 @@
 ###############################################################################
-# SQS - dead-letter queues
+# SQS - one queue + DLQ per store
+#
+# All FIFO now, products included. Products does not need ordering, but it
+# shares a queue with orders and inventory, which do — and a queue is FIFO or
+# it is not. The cost is FIFO's 300 TPS ceiling without batching, comfortably
+# above Shopify webhook volume for a single store.
 ###############################################################################
 
 resource "aws_sqs_queue" "dlq" {
   for_each = local.store_queues
 
   name                        = each.value.dlq_name
-  fifo_queue                  = each.value.fifo
-  content_based_deduplication = each.value.fifo
+  fifo_queue                  = true
+  content_based_deduplication = true
 
   visibility_timeout_seconds = 30
   message_retention_seconds  = 1209600 # 14 days
@@ -16,16 +21,12 @@ resource "aws_sqs_queue" "dlq" {
   tags = merge(local.default_tags, { Name = each.value.dlq_name })
 }
 
-###############################################################################
-# SQS - main queues (with redrive to the matching DLQ)
-###############################################################################
-
 resource "aws_sqs_queue" "main" {
   for_each = local.store_queues
 
   name                        = each.value.queue_name
-  fifo_queue                  = each.value.fifo
-  content_based_deduplication = each.value.fifo
+  fifo_queue                  = true
+  content_based_deduplication = true
 
   visibility_timeout_seconds = 300
   message_retention_seconds  = 345600 # 4 days
@@ -42,7 +43,8 @@ resource "aws_sqs_queue" "main" {
   tags = merge(local.default_tags, { Name = each.value.queue_name })
 }
 
-# Allow the matching EventBridge rule to deliver to each main queue.
+# Admit exactly the three rules that feed this store's queue — not every rule
+# in the account, and not the other stores' rules.
 resource "aws_sqs_queue_policy" "main" {
   for_each = local.store_queues
 
@@ -58,7 +60,7 @@ resource "aws_sqs_queue_policy" "main" {
         Action    = "sqs:SendMessage"
         Resource  = aws_sqs_queue.main[each.key].arn
         Condition = {
-          ArnEquals = { "aws:SourceArn" = aws_cloudwatch_event_rule.this[each.key].arn }
+          ArnEquals = { "aws:SourceArn" = local.store_rule_arns[each.key] }
         }
       }
     ]
@@ -66,11 +68,11 @@ resource "aws_sqs_queue_policy" "main" {
 }
 
 ###############################################################################
-# EventBridge - rules on the Shopify partner buses + SQS targets
+# EventBridge - one rule per (store, topic), all targeting the store's queue
 ###############################################################################
 
 resource "aws_cloudwatch_event_rule" "this" {
-  for_each = local.store_queues
+  for_each = local.store_rules
 
   name           = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}"
   event_bus_name = each.value.event_bus
@@ -89,18 +91,16 @@ resource "aws_cloudwatch_event_rule" "this" {
 }
 
 resource "aws_cloudwatch_event_target" "this" {
-  for_each = local.store_queues
+  for_each = local.store_rules
 
   rule           = aws_cloudwatch_event_rule.this[each.key].name
   event_bus_name = each.value.event_bus
-  arn            = aws_sqs_queue.main[each.key].arn
+  arn            = aws_sqs_queue.main[each.value.store_id].arn
 
-  # FIFO queues require a message group id; standard queues must not set one.
-  dynamic "sqs_target" {
-    for_each = each.value.fifo ? [1] : []
-    content {
-      message_group_id = "${each.value.store_id}-${each.value.queue_type}"
-    }
+  # The group id is the whole mechanism: it keeps each topic ordered within
+  # itself while letting the three run in parallel inside one queue.
+  sqs_target {
+    message_group_id = each.value.message_group_id
   }
 }
 

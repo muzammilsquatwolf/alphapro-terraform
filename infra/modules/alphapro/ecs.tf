@@ -227,7 +227,7 @@ resource "aws_ecs_service" "web" {
 resource "aws_ecs_task_definition" "consumer" {
   for_each = local.active_consumers
 
-  family                   = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-consumer"
+  family                   = "${local.name_prefix}-${each.value.store_id}-consumer"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
 
@@ -246,12 +246,12 @@ resource "aws_ecs_task_definition" "consumer" {
 
   container_definitions = jsonencode([
     {
-      name      = "${each.value.queue_type}-consumer"
+      name      = "${each.value.store_id}-consumer"
       image     = var.container_image
       essential = true
       command = [
         "sh", "-c",
-        "echo '>>> Starting ${each.value.queue_type} consumer for store ${each.value.store_id}...' && exec python -m app.consumers.${each.value.queue_type}"
+        "echo '>>> Starting consumer for store ${each.value.store_id}...' && exec uv run python -m ${var.consumer_module}"
       ]
       environment = concat([
         { name = "APP_URL", value = each.value.app_url },
@@ -261,8 +261,12 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
-        { name = "QUEUE_TYPE", value = each.value.queue_type },
-        { name = "QUEUE_URL", value = aws_sqs_queue.main[each.key].url },
+        # JSON array, not a bare URL. The name is plural and the field is typed
+        # as a collection in the application's pydantic Settings, so
+        # pydantic-settings json.loads() it — a plain URL fails at "Expecting
+        # value: line 1 column 1" before the consumer starts. Same shape as
+        # CELERY_SQS_QUEUE_URLS.
+        { name = "SHOPIFY_SQS_QUEUE_URLS", value = jsonencode([aws_sqs_queue.main[each.key].url]) },
         { name = "SHOPIFY_SQS_STRICT_HMAC", value = var.shopify_sqs_strict_hmac },
         { name = "STORE_ID", value = each.value.store_id },
         { name = "STORE_NAME", value = each.value.store_name },
@@ -294,7 +298,7 @@ resource "aws_ecs_task_definition" "consumer" {
       # poll and check its mtime here — then "alive" means "still polling"
       # rather than "still loaded".
       healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if 'app.consumers' in open('/proc/1/cmdline').read() else 1)\""]
+        command     = ["CMD-SHELL", "python -c \"import sys;sys.exit(0 if '${var.consumer_module}' in open('/proc/1/cmdline').read() else 1)\""]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -305,7 +309,7 @@ resource "aws_ecs_task_definition" "consumer" {
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
           "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "${each.value.store_id}-${each.value.queue_type}"
+          "awslogs-stream-prefix" = "${each.value.store_id}-consumer"
         }
       }
     }
@@ -317,7 +321,7 @@ resource "aws_ecs_task_definition" "consumer" {
 resource "aws_ecs_service" "consumer" {
   for_each = local.active_consumers
 
-  name            = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-consumer"
+  name            = "${local.name_prefix}-${each.value.store_id}-consumer"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.consumer[each.key].arn
   desired_count   = var.consumer_desired_count
@@ -415,7 +419,7 @@ resource "aws_appautoscaling_target" "consumer" {
 resource "aws_appautoscaling_policy" "consumer_cpu" {
   for_each = local.active_consumers
 
-  name               = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-cpu"
+  name               = "${local.name_prefix}-${each.value.store_id}-consumer-cpu"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.consumer[each.key].resource_id
   scalable_dimension = aws_appautoscaling_target.consumer[each.key].scalable_dimension

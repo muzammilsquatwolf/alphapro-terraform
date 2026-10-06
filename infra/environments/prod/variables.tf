@@ -253,28 +253,10 @@ variable "enable_consumers" {
   default     = true
 }
 
-variable "consumer_queue_types" {
-  description = <<-EOT
-    Which queue types get a consumer service, out of inventory, orders and
-    products. Applies to every store — there is no per-store override, because
-    a store processing a different set of webhooks than its siblings is far more
-    often a mistake than an intention.
-
-    Dropping a type here removes its 4 services (one per store) and their
-    no-running-tasks alarms. It does NOT touch that type's SQS queues, DLQs or
-    EventBridge rules, so webhooks keep arriving and queue up for whenever the
-    consumers come back. Watch the queue retention window if a type stays off
-    for long — messages past it are gone.
-
-    Has no effect at all while enable_consumers is false.
-  EOT
-  type        = list(string)
-  default     = ["inventory", "orders", "products"]
-
-  validation {
-    condition     = length(setsubtract(var.consumer_queue_types, ["inventory", "orders", "products"])) == 0
-    error_message = "consumer_queue_types may only contain: inventory, orders, products."
-  }
+variable "consumer_module" {
+  description = "Python module each consumer runs, as `python -m <module>`. With one queue per store it must dispatch on X-Shopify-Topic itself."
+  type        = string
+  default     = "app.workers.sqs_consumer"
 }
 
 variable "worker_desired_count" {
@@ -409,11 +391,7 @@ variable "stores" {
     store_name = string
     event_bus  = string
 
-    # Which queue types get a consumer for THIS store. Null (the default) falls
-    # back to var.consumer_queue_types; an empty list means none. Per-store
-    # because one store can legitimately be live while its siblings are not —
-    # the queues keep filling for all of them either way.
-    consumer_queue_types = optional(list(string))
+    consumer_enabled = optional(bool)
 
     # Optional workers, keyed by name (orders, products, inventory, ...).
     # Each becomes its own ECS service. args is the full argument list after

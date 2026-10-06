@@ -44,20 +44,18 @@ locals {
     var.tags,
   )
 
-  # Queue types and how they map to Shopify webhook topics. inventory & orders
-  # are FIFO (ordered), products is a standard queue.
+  # Shopify webhook topics routed into each store's queue. fifo is gone from
+  # here: the store queue is FIFO for everything now, and the three types stay
+  # separated by message group rather than by queue.
   queue_config = {
-    inventory = { fifo = true, topic_prefix = "inventory_levels/" }
-    orders    = { fifo = true, topic_prefix = "orders/" }
-    products  = { fifo = false, topic_prefix = "products/" }
+    inventory = { topic_prefix = "inventory_levels/" }
+    orders    = { topic_prefix = "orders/" }
+    products  = { topic_prefix = "products/" }
   }
 
-  # Cartesian product of stores x queue types, keyed "ksa-inventory", etc.
-  # This single map drives SQS queues, DLQs, queue policies, EventBridge rules
-  # and targets, consumer task definitions/services, autoscaling, and alarms.
   # Cartesian product of stores x their enabled workers, keyed
-  # "uae-orders", "uae-products", ... — the same shape as store_queues, so
-  # enabling one worker is additive and never reshuffles the others.
+  # "uae-orders", "uae-products", ... — enabling one worker is additive and
+  # never reshuffles the others.
   store_workers = merge([
     for sid, s in var.stores : {
       for name, sy in try(s.workers, {}) :
@@ -71,46 +69,63 @@ locals {
     }
   ]...)
 
-  store_queues = merge([
+  # ONE queue per store, not one per store x type.
+  #
+  # The three types share it and stay apart by SQS message group — see
+  # local.store_rules. FIFO delivers different groups in parallel, so orders,
+  # products and inventory still process concurrently and still keep order
+  # within themselves; what changes is that a single consumer drains all three
+  # instead of three consumers draining one each.
+  #
+  # Always created, for every store, regardless of whether a consumer runs.
+  # A store with its consumer off keeps accumulating webhooks rather than
+  # dropping them.
+  store_queues = {
+    for sid, s in var.stores : sid => {
+      store_id   = sid
+      store_name = s.store_name
+      app_url    = var.app_url
+      event_bus  = s.event_bus
+      queue_name = "${var.project}-${var.environment}-${sid}.fifo"
+      dlq_name   = "${var.project}-${var.environment}-${sid}-dlq.fifo"
+    }
+  }
+
+  # EventBridge still needs one rule per (store, type): a rule lives on exactly
+  # one bus and matches exactly one topic prefix, and each store has its own
+  # bus. All three of a store's rules now target that store's single queue.
+  #
+  # message_group_id is the queue type. That is what preserves per-type
+  # ordering inside a shared queue, and what keeps a stuck message in one type
+  # from blocking the other two.
+  store_rules = merge([
     for sid, s in var.stores : {
       for qt, qc in local.queue_config :
       "${sid}-${qt}" => {
-        store_id   = sid
-        store_name = s.store_name
-        # Shared across every store — see var.app_url's description.
-        app_url = var.app_url
-        # This store's own bus. All 3 of its rules attach here and separate
-        # from each other by X-Shopify-Topic prefix.
-        event_bus    = s.event_bus
-        queue_type   = qt
-        fifo         = qc.fifo
-        topic_prefix = qc.topic_prefix
-        # FIFO queue/DLQ names carry the .fifo suffix.
-        queue_name = qc.fifo ? "${var.project}-${var.environment}-${sid}-${qt}.fifo" : "${var.project}-${var.environment}-${sid}-${qt}"
-        dlq_name   = qc.fifo ? "${var.project}-${var.environment}-${sid}-${qt}-dlq.fifo" : "${var.project}-${var.environment}-${sid}-${qt}-dlq"
+        store_id         = sid
+        queue_type       = qt
+        event_bus        = s.event_bus
+        topic_prefix     = qc.topic_prefix
+        message_group_id = qt
       }
     }
   ]...)
 
-  # Which (store, queue type) pairs actually get a consumer service.
-  #
-  # Deliberately NOT applied to store_queues itself: the SQS queues, DLQs and
-  # EventBridge rules stay in place for every type regardless, so a paused type
-  # keeps accumulating webhooks instead of dropping them on the floor. Only the
-  # compute that drains them is switched off.
-  # Per-store list, falling back to the environment-wide one. Written as an
-  # explicit null check rather than coalesce(): coalesce skips empty values, so
-  # a store asking for [] (no consumers at all) would silently inherit the
-  # global list instead.
-  store_consumer_types = {
-    for sid, s in var.stores : sid => (
-      try(s.consumer_queue_types, null) != null ? s.consumer_queue_types : var.consumer_queue_types
-    )
+  # Rule ARNs grouped by store, so each queue policy can admit exactly the
+  # three rules that feed it and nothing else.
+  store_rule_arns = {
+    for sid in keys(var.stores) : sid => [
+      for k, r in local.store_rules : aws_cloudwatch_event_rule.this[k].arn if r.store_id == sid
+    ]
   }
 
+  # One consumer per store. Per-store flag first, then the environment-wide
+  # default, then true — written as explicit null checks because coalesce()
+  # skips false as well as null, which would make "consumer_enabled = false"
+  # silently inherit the default instead.
   active_consumers = var.enable_consumers ? {
-    for k, v in local.store_queues : k => v
-    if contains(local.store_consumer_types[v.store_id], v.queue_type)
+    for sid, q in local.store_queues : sid => q
+    if try(var.stores[sid].consumer_enabled, null) != null ? var.stores[sid].consumer_enabled : true
   } : {}
 
   # Appended to the web, consumer and worker environments. An empty list when

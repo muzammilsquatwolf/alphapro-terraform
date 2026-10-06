@@ -39,7 +39,7 @@ module "alphapro" {
   web_min_capacity                   = var.web_min_capacity
   web_max_capacity                   = var.web_max_capacity
   enable_consumers                   = var.enable_consumers
-  consumer_queue_types               = var.consumer_queue_types
+  consumer_module                    = var.consumer_module
   worker_desired_count               = var.worker_desired_count
   consumer_desired_count             = var.consumer_desired_count
   consumer_min_capacity              = var.consumer_min_capacity

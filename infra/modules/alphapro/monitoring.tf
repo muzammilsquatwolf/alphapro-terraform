@@ -11,14 +11,14 @@ resource "aws_sns_topic_subscription" "alarms_email" {
 }
 
 ###############################################################################
-# Per-service alarms (3 per store/queue-type => 18 total)
+# Per-store alarms (3 each => 12 total)
 ###############################################################################
 
 # DLQ has any visible messages -> something failed past the retry limit.
 resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
   for_each = local.store_queues
 
-  alarm_name          = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-dlq-not-empty"
+  alarm_name          = "${local.name_prefix}-${each.value.store_id}-dlq-not-empty"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "ApproximateNumberOfMessagesVisible"
@@ -70,7 +70,7 @@ resource "aws_cloudwatch_metric_alarm" "celery_dlq_not_empty" {
 resource "aws_cloudwatch_metric_alarm" "no_running_tasks" {
   for_each = local.active_consumers
 
-  alarm_name          = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-no-running-tasks"
+  alarm_name          = "${local.name_prefix}-${each.value.store_id}-no-running-tasks"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = 2
   metric_name         = "RunningTaskCount"
@@ -96,7 +96,7 @@ resource "aws_cloudwatch_metric_alarm" "no_running_tasks" {
 resource "aws_cloudwatch_metric_alarm" "queue_depth" {
   for_each = local.store_queues
 
-  alarm_name          = "${local.name_prefix}-${each.value.store_id}-${each.value.queue_type}-queue-depth"
+  alarm_name          = "${local.name_prefix}-${each.value.store_id}-queue-depth"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   metric_name         = "ApproximateNumberOfMessagesVisible"

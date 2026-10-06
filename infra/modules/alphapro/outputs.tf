@@ -68,27 +68,13 @@ output "store_event_buses" {
 }
 
 output "store_queue_urls" {
-  description = "Map of store id to its main SQS queue URLs by type."
-  value = {
-    for sid in keys(var.stores) : sid => {
-      for qt in keys(local.queue_config) : qt => aws_sqs_queue.main["${sid}-${qt}"].url
-    }
-  }
+  description = "Map of store id to its single SQS queue URL."
+  value       = { for sid, q in aws_sqs_queue.main : sid => q.url }
 }
 
 output "store_ecs_services" {
-  description = "Map of store id to its consumer ECS service names by type. Empty per store when enable_consumers is false."
-  value = {
-    for sid in keys(var.stores) : sid => {
-      # Filtered against the resource map rather than indexed blindly. The
-      # consumers are gated on var.enable_consumers, so with it false this
-      # collection is empty and indexing it fails the whole plan with one
-      # "Invalid index" per store x queue type — before anything can apply.
-      for qt in keys(local.queue_config) :
-      qt => aws_ecs_service.consumer["${sid}-${qt}"].name
-      if contains(keys(aws_ecs_service.consumer), "${sid}-${qt}")
-    }
-  }
+  description = "Map of store id to its consumer ECS service name. Absent for a store whose consumer is off."
+  value       = { for sid, svc in aws_ecs_service.consumer : sid => svc.name }
 }
 
 output "documentdb_security_group_id" {
