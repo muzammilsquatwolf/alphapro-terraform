@@ -26,3 +26,5 @@ output "store_event_buses" { value = module.alphapro.store_event_buses }
 output "store_queue_urls" { value = module.alphapro.store_queue_urls }
 output "store_ecs_services" { value = module.alphapro.store_ecs_services }
 output "documentdb_security_group_id" { value = module.alphapro.documentdb_security_group_id }
+output "public_assets_bucket" { value = module.alphapro.public_assets_bucket }
+output "public_assets_domain" { value = module.alphapro.public_assets_domain }

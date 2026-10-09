@@ -82,6 +82,7 @@ resource "aws_ecs_task_definition" "web" {
         { name = "REDIS_URL", value = local.cache_url },
         { name = "DOCS_ENABLED", value = tostring(var.docs_enabled) },
         { name = "CELERY_BROKER_URL", value = local.broker_url },
+        { name = "CELERY_BEAT_SCHEDULER", value = "redbeat.RedBeatScheduler" },
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
@@ -90,7 +91,8 @@ resource "aws_ecs_task_definition" "web" {
         ],
         # Application-level settings from var.web_env, sorted for a stable diff.
         [for k in sort(keys(var.web_env)) : { name = k, value = var.web_env[k] }],
-        local.celery_queue_env
+        local.celery_queue_env,
+        local.public_assets_env
       )
       secrets = concat([
         { name = "DB_HOST", valueFrom = "${local.database_secret_arn}:host::" },
@@ -258,6 +260,7 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "REDIS_URL", value = local.cache_url },
         { name = "CELERY_BROKER_URL", value = local.broker_url },
+        { name = "CELERY_BEAT_SCHEDULER", value = "redbeat.RedBeatScheduler" },
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
@@ -272,7 +275,8 @@ resource "aws_ecs_task_definition" "consumer" {
         { name = "STORE_NAME", value = each.value.store_name },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
         ],
-        local.celery_queue_env
+        local.celery_queue_env,
+        local.public_assets_env
       )
       # Exactly the same keys the web task reads, from the same secret.
       secrets = concat([

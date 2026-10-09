@@ -59,6 +59,7 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "REDIS_URL", value = local.cache_url },
         { name = "CELERY_BROKER_URL", value = local.broker_url },
+        { name = "CELERY_BEAT_SCHEDULER", value = "redbeat.RedBeatScheduler" },
         { name = "DB_CONNECTION", value = "postgresql" },
         { name = "ENVIRONMENT", value = var.environment },
         { name = "INFRA_RELEASE_VERSION", value = var.infra_release_version },
@@ -67,7 +68,8 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "WORKER_NAME", value = each.value.worker_name },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.id },
         ],
-        local.celery_queue_env
+        local.celery_queue_env,
+        local.public_assets_env
       )
 
       secrets = concat([

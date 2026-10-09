@@ -498,6 +498,7 @@ variable "stores" {
     store_name = string
     event_bus  = string
 
+
     # Whether this store runs a consumer. Null (the default) means yes. The
     # queue and its rules exist either way, so a store with this false keeps
     # accumulating webhooks instead of dropping them.
@@ -566,6 +567,17 @@ variable "celery_worker_desired_count" {
   description = "Number of Celery worker tasks. 0 pauses the worker while keeping the service and its task definition in place. Only has an effect when enable_celery_queue is true."
   type        = number
   default     = 1
+}
+
+variable "celery_beat_desired_count" {
+  description = "Celery beat tasks. 1 or 0 — beat is a singleton, and two instances would double-fire every scheduled job. 0 pauses the scheduler while keeping the service in place. Only applies when enable_celery_queue is true."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.celery_beat_desired_count <= 1
+    error_message = "celery_beat_desired_count must be 0 or 1 — beat is a singleton."
+  }
 }
 
 variable "enable_mongodb" {
@@ -730,6 +742,51 @@ variable "s3_bucket_name" {
     environment.
   EOT
   type        = string
+}
+
+###############################################################################
+# Public assets (sitemaps, feeds) - S3 behind CloudFront
+###############################################################################
+
+variable "public_assets_bucket_name" {
+  description = <<-EOT
+    Bucket for publicly-fetchable files: sitemaps, Facebook catalogue feeds,
+    anything a crawler needs to GET. Empty (the default) disables the bucket,
+    the CloudFront distribution and the task role's write access to it.
+
+    Deliberately separate from s3_bucket_name. That bucket is the application's
+    private working store, and making part of it public means weakening
+    bucket-wide access blocks. Names are globally unique across all of AWS, so
+    this is always explicit.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "public_assets_host" {
+  description = "Hostname serving the public assets, e.g. asset.squatwolf.com. Each store writes under its own prefix, so URLs read <host>/<store>/sitemap.xml. Requires public_assets_certificate_arn; without both, CloudFront serves on its own *.cloudfront.net domain."
+  type        = string
+  default     = ""
+}
+
+
+variable "public_assets_certificate_arn" {
+  description = <<-EOT
+    ACM certificate for public_assets_host.
+
+    MUST be issued in us-east-1, whatever region the rest of this stack runs
+    in — CloudFront only reads certificates from there, and the ap-southeast-1
+    certificate this stack uses for its ALB cannot be reused. Leaving it empty
+    serves the distribution on its *.cloudfront.net domain instead, which works
+    for a Facebook feed and is awkward for a sitemap.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.public_assets_certificate_arn == "" || can(regex("^arn:aws:acm:us-east-1:", var.public_assets_certificate_arn))
+    error_message = "public_assets_certificate_arn must be an ACM certificate in us-east-1 — CloudFront reads certificates from no other region."
+  }
 }
 
 ###############################################################################

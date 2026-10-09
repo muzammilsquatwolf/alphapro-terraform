@@ -76,6 +76,12 @@
       "Effect": "Allow",
       "Action": "application-autoscaling:*",
       "Resource": "*"
+    },
+    {
+      "Sid": "CloudFront",
+      "Effect": "Allow",
+      "Action": "cloudfront:*",
+      "Resource": "*"
     }
   ]
 }

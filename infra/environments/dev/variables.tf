@@ -391,6 +391,7 @@ variable "stores" {
     store_name = string
     event_bus  = string
 
+
     consumer_enabled = optional(bool)
 
     # Optional workers, keyed by name (orders, products, inventory, ...).
@@ -450,6 +451,17 @@ variable "celery_worker_desired_count" {
   description = "Number of Celery worker tasks. 0 pauses the worker while keeping the service and its task definition in place. Only has an effect when enable_celery_queue is true."
   type        = number
   default     = 1
+}
+
+variable "celery_beat_desired_count" {
+  description = "Celery beat tasks. 1 or 0 — beat is a singleton, and two instances would double-fire every scheduled job. 0 pauses the scheduler while keeping the service in place. Only applies when enable_celery_queue is true."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.celery_beat_desired_count <= 1
+    error_message = "celery_beat_desired_count must be 0 or 1 — beat is a singleton."
+  }
 }
 
 variable "enable_mongodb" {
@@ -609,6 +621,25 @@ variable "s3_bucket_name" {
     environment.
   EOT
   type        = string
+}
+
+variable "public_assets_bucket_name" {
+  description = "Bucket for publicly-fetchable files (sitemaps, feeds), served through CloudFront. Empty disables it."
+  type        = string
+  default     = ""
+}
+
+variable "public_assets_host" {
+  description = "Hostname serving the public assets, e.g. asset.squatwolf.com. Each store writes under its own prefix, so URLs read <host>/<store>/sitemap.xml. Requires public_assets_certificate_arn; without both, CloudFront serves on its own *.cloudfront.net domain."
+  type        = string
+  default     = ""
+}
+
+
+variable "public_assets_certificate_arn" {
+  description = "ACM certificate for public_assets_host. MUST be in us-east-1 — CloudFront reads certificates from no other region."
+  type        = string
+  default     = ""
 }
 
 ###############################################################################

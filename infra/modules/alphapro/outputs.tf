@@ -81,3 +81,13 @@ output "documentdb_security_group_id" {
   description = "Security group to attach to the manually-created DocumentDB cluster. Null when enable_mongodb is false."
   value       = one(aws_security_group.documentdb[*].id)
 }
+
+output "public_assets_bucket" {
+  description = "Bucket to write sitemaps and feeds into. Null when public assets are disabled."
+  value       = one(aws_s3_bucket.public_assets[*].id)
+}
+
+output "public_assets_domain" {
+  description = "CloudFront domain serving the public assets. Point a CNAME at this if using a custom host."
+  value       = one(aws_cloudfront_distribution.public_assets[*].domain_name)
+}
