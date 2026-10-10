@@ -141,3 +141,48 @@ resource "aws_iam_role_policy_attachment" "ecs_task_s3_assets" {
   role       = aws_iam_role.ecs_task.name
   policy_arn = aws_iam_policy.ecs_s3_assets.arn
 }
+
+###############################################################################
+# ECS Exec — a shell into a running task.
+#
+# Three things have to line up: the service sets enable_execute_command, the
+# CALLER holds ecs:ExecuteCommand, and the TASK ROLE can open an SSM channel.
+# The agent runs inside the task and talks outbound to Systems Manager, so
+# these are the task's permissions, not the execution role's.
+#
+# Fargate 1.4.0+ ships the agent, so nothing changes in the image.
+###############################################################################
+
+resource "aws_iam_policy" "ecs_exec" {
+  count = var.enable_ecs_exec ? 1 : 0
+
+  name        = "${local.iam_prefix}-ecs-exec"
+  description = "Allow ECS Exec sessions into tasks"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+        ]
+        # ssmmessages has no resource-level permissions; the channel is scoped
+        # by which task the caller can reach, not by this ARN.
+        Resource = "*"
+      },
+    ]
+  })
+
+  tags = local.default_tags
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_exec" {
+  count = var.enable_ecs_exec ? 1 : 0
+
+  role       = aws_iam_role.ecs_task.name
+  policy_arn = aws_iam_policy.ecs_exec[0].arn
+}

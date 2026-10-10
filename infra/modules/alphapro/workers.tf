@@ -51,7 +51,7 @@ resource "aws_ecs_task_definition" "worker" {
       # directly on task stop, rather than the signal being swallowed.
       command = [
         "sh", "-c",
-        "echo '>>> Starting ${each.value.worker_name} worker for store ${each.value.store_id}...' && exec python -m app.cli.main ${join(" ", each.value.args)}"
+        "echo '>>> Starting ${each.value.worker_name} worker for store ${each.value.store_id}...' && exec uv run python -m app.cli.main ${join(" ", each.value.args)}"
       ]
 
       environment = concat([

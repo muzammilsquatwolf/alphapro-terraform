@@ -452,6 +452,21 @@ variable "container_insights" {
   default     = true
 }
 
+variable "enable_ecs_exec" {
+  description = <<-EOT
+    Allow `aws ecs execute-command` to open a shell inside running tasks.
+
+    Convenient, and a real grant: a shell in a task can read every injected
+    secret from its own environment and reach the database and queues with the
+    task role's permissions. Sessions are logged as ECS API calls in CloudTrail
+    but their CONTENTS are not, unless logging is configured on the cluster.
+
+    Enabling it changes every service, so expect a redeploy.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enable_deployment_circuit_breaker" {
   description = <<-EOT
     Let ECS abandon a rolling deployment whose tasks keep failing to start,

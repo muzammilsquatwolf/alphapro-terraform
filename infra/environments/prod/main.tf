@@ -54,6 +54,7 @@ module "alphapro" {
   health_check_timeout               = var.health_check_timeout
   web_health_check_grace_period      = var.web_health_check_grace_period
   container_insights                 = var.container_insights
+  enable_ecs_exec                    = var.enable_ecs_exec
   enable_deployment_circuit_breaker  = var.enable_deployment_circuit_breaker
 
   # Stores
