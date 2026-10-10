@@ -580,6 +580,12 @@ variable "celery_beat_desired_count" {
   }
 }
 
+variable "sitemap_desired_count" {
+  description = "Tasks for the sitemap service. The job exits when it finishes, so a count of 1 means it regenerates continuously; 0 stops it and leaves the task definition registered for manual runs."
+  type        = number
+  default     = 0
+}
+
 variable "enable_mongodb" {
   description = "Inject MONGODB_URL into the web, consumer and worker tasks, read from the MONGODB_URL key of this environment's database secret. Off where that key does not exist — a task cannot start without a key it references."
   type        = bool
@@ -744,24 +750,43 @@ variable "s3_bucket_name" {
   type        = string
 }
 
+variable "enable_public_assets" {
+  description = <<-EOT
+    Serve part of the assets bucket publicly through CloudFront: sitemaps,
+    product feeds, anything a crawler must GET.
+
+    The bucket keeps all four public-access blocks — CloudFront reads through
+    Origin Access Control, which signs as a principal rather than needing the
+    bucket open. Only var.public_assets_prefix is reachable; the rest of the
+    bucket stays private.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "public_assets_prefix" {
+  description = <<-EOT
+    Key prefix within the assets bucket that CloudFront serves, without
+    slashes. Objects written to <prefix>/x.xml are fetched as <host>/x.xml.
+
+    This is the containment boundary: the distribution is rooted here and the
+    bucket policy grants read on this prefix only, so the rest of the bucket is
+    unreachable through the CDN. Changing it moves the public surface — expect
+    every published URL to change with it.
+  EOT
+  type        = string
+  default     = "public"
+
+  validation {
+    condition     = !startswith(var.public_assets_prefix, "/") && !endswith(var.public_assets_prefix, "/")
+    error_message = "public_assets_prefix must not start or end with a slash — it is interpolated into both an origin_path and an ARN."
+  }
+}
+
 ###############################################################################
 # Public assets (sitemaps, feeds) - S3 behind CloudFront
 ###############################################################################
 
-variable "public_assets_bucket_name" {
-  description = <<-EOT
-    Bucket for publicly-fetchable files: sitemaps, Facebook catalogue feeds,
-    anything a crawler needs to GET. Empty (the default) disables the bucket,
-    the CloudFront distribution and the task role's write access to it.
-
-    Deliberately separate from s3_bucket_name. That bucket is the application's
-    private working store, and making part of it public means weakening
-    bucket-wide access blocks. Names are globally unique across all of AWS, so
-    this is always explicit.
-  EOT
-  type        = string
-  default     = ""
-}
 
 variable "public_assets_host" {
   description = "Hostname serving the public assets, e.g. asset.squatwolf.com. Each store writes under its own prefix, so URLs read <host>/<store>/sitemap.xml. Requires public_assets_certificate_arn; without both, CloudFront serves on its own *.cloudfront.net domain."

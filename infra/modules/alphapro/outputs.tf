@@ -82,12 +82,24 @@ output "documentdb_security_group_id" {
   value       = one(aws_security_group.documentdb[*].id)
 }
 
-output "public_assets_bucket" {
-  description = "Bucket to write sitemaps and feeds into. Null when public assets are disabled."
-  value       = one(aws_s3_bucket.public_assets[*].id)
+output "public_assets_prefix" {
+  description = "Where to write sitemaps and feeds: this prefix of the assets bucket is what CloudFront serves."
+  value       = local.enable_public_assets ? "s3://${aws_s3_bucket.assets.id}/${var.public_assets_prefix}/" : null
 }
 
 output "public_assets_domain" {
   description = "CloudFront domain serving the public assets. Point a CNAME at this if using a custom host."
   value       = one(aws_cloudfront_distribution.public_assets[*].domain_name)
+}
+
+output "oneshot_task_run_config" {
+  description = "What the ECS console asks for when running a one-shot task definition: which cluster, which subnets, which security group."
+  value = {
+    cluster         = aws_ecs_cluster.this.name
+    task_definition = aws_ecs_task_definition.sitemap.family
+    launch_type     = "FARGATE"
+    subnets         = aws_subnet.private[*].id
+    security_group  = aws_security_group.ecs.id
+    public_ip       = "DISABLED"
+  }
 }

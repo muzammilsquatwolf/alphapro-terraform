@@ -464,6 +464,12 @@ variable "celery_beat_desired_count" {
   }
 }
 
+variable "sitemap_desired_count" {
+  description = "Tasks for the sitemap service. The job exits when it finishes, so a count of 1 means it regenerates continuously; 0 stops it and leaves the task definition registered for manual runs."
+  type        = number
+  default     = 0
+}
+
 variable "enable_mongodb" {
   description = "Inject MONGODB_URL into the web, consumer and worker tasks, read from the MONGODB_URL key of this environment's database secret. Off where that key does not exist — a task cannot start without a key it references."
   type        = bool
@@ -623,11 +629,18 @@ variable "s3_bucket_name" {
   type        = string
 }
 
-variable "public_assets_bucket_name" {
-  description = "Bucket for publicly-fetchable files (sitemaps, feeds), served through CloudFront. Empty disables it."
-  type        = string
-  default     = ""
+variable "enable_public_assets" {
+  description = "Serve the public_assets_prefix of the assets bucket through CloudFront. The bucket itself stays private."
+  type        = bool
+  default     = false
 }
+
+variable "public_assets_prefix" {
+  description = "Key prefix within the assets bucket that CloudFront serves. No leading or trailing slash."
+  type        = string
+  default     = "public"
+}
+
 
 variable "public_assets_host" {
   description = "Hostname serving the public assets, e.g. asset.squatwolf.com. Each store writes under its own prefix, so URLs read <host>/<store>/sitemap.xml. Requires public_assets_certificate_arn; without both, CloudFront serves on its own *.cloudfront.net domain."

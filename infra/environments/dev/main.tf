@@ -64,6 +64,7 @@ module "alphapro" {
   enable_celery_queue           = var.enable_celery_queue
   celery_worker_desired_count   = var.celery_worker_desired_count
   celery_beat_desired_count     = var.celery_beat_desired_count
+  sitemap_desired_count         = var.sitemap_desired_count
   enable_mongodb                = var.enable_mongodb
   documentdb_port               = var.documentdb_port
 
@@ -92,7 +93,8 @@ module "alphapro" {
 
   # Storage
   s3_bucket_name                = var.s3_bucket_name
-  public_assets_bucket_name     = var.public_assets_bucket_name
+  enable_public_assets          = var.enable_public_assets
+  public_assets_prefix          = var.public_assets_prefix
   public_assets_host            = var.public_assets_host
   public_assets_certificate_arn = var.public_assets_certificate_arn
 
