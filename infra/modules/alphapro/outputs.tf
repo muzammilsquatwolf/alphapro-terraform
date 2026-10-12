@@ -92,11 +92,12 @@ output "public_assets_domain" {
   value       = one(aws_cloudfront_distribution.public_assets[*].domain_name)
 }
 
-output "oneshot_task_run_config" {
-  description = "What the ECS console asks for when running a one-shot task definition: which cluster, which subnets, which security group."
+output "shell_task_run_config" {
+  description = "Cluster, subnets and security group for the exec shell task — what the ECS console asks for when running a task by hand."
   value = {
     cluster         = aws_ecs_cluster.this.name
-    task_definition = aws_ecs_task_definition.sitemap.family
+    service         = one(aws_ecs_service.shell[*].name)
+    task_definition = one(aws_ecs_task_definition.shell[*].family)
     launch_type     = "FARGATE"
     subnets         = aws_subnet.private[*].id
     security_group  = aws_security_group.ecs.id

@@ -479,11 +479,12 @@ variable "celery_beat_desired_count" {
   }
 }
 
-variable "sitemap_desired_count" {
-  description = "Tasks for the sitemap service. The job exits when it finishes, so a count of 1 means it regenerates continuously; 0 stops it and leaves the task definition registered for manual runs."
+variable "resource_events_desired_count" {
+  description = "Tasks for the resource-events worker. One process per environment, not per store — the command takes no --channel-id. 0 pauses it while keeping the service and task definition."
   type        = number
   default     = 0
 }
+
 
 variable "enable_mongodb" {
   description = "Inject MONGODB_URL into the web, consumer and worker tasks, read from the MONGODB_URL key of this environment's database secret. Off where that key does not exist — a task cannot start without a key it references."
