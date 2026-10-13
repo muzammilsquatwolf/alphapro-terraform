@@ -614,6 +614,23 @@ variable "documentdb_port" {
   default     = 27017
 }
 
+variable "enable_default_vpc_peering" {
+  description = <<-EOT
+    Peer this VPC with the account's default VPC, so instances there can reach
+    things here — DocumentDB in particular.
+
+    Creates the connection, routes on BOTH sides, DNS resolution across it, and
+    a DocumentDB ingress rule for the default VPC's CIDR. The default VPC is
+    discovered, not configured.
+
+    Requires non-overlapping CIDRs: the default VPC is 172.31.0.0/16 and this
+    stack uses 10.x, so they do not collide. Peering is non-transitive — it
+    connects these two VPCs and nothing beyond them.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "shopify_sqs_strict_hmac" {
   description = "Value for the SHOPIFY_SQS_STRICT_HMAC consumer env var."
   type        = string

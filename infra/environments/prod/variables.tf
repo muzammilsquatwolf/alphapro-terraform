@@ -498,6 +498,12 @@ variable "documentdb_port" {
   default     = 27017
 }
 
+variable "enable_default_vpc_peering" {
+  description = "Peer this VPC with the account's default VPC so instances there can reach DocumentDB. Creates routes on both sides and enables DNS resolution across the connection."
+  type        = bool
+  default     = false
+}
+
 variable "shopify_sqs_strict_hmac" {
   description = "Value for the SHOPIFY_SQS_STRICT_HMAC consumer env var."
   type        = string

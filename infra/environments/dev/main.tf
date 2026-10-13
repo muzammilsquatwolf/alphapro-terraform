@@ -68,6 +68,7 @@ module "alphapro" {
   resource_events_desired_count = var.resource_events_desired_count
   enable_mongodb                = var.enable_mongodb
   documentdb_port               = var.documentdb_port
+  enable_default_vpc_peering    = var.enable_default_vpc_peering
 
   # Database
   db_host                    = var.db_host
