@@ -45,12 +45,24 @@ locals {
   )
 
   # Shopify webhook topics routed into each store's queue. fifo is gone from
-  # here: the store queue is FIFO for everything now, and the three types stay
+  # here: the store queue is FIFO for everything now, and the types stay
   # separated by message group rather than by queue.
+  #
+  # The value is matched as a PREFIX, so one entry can cover a whole family:
+  # "orders/" catches orders/create, orders/updated, orders/cancelled and
+  # every other orders topic without further config.
+  #
+  # "returns/approve" is deliberately NOT a family. It matches that one topic
+  # and ignores returns/request, returns/cancel, returns/decline and the rest,
+  # because approval is the event that actually moves stock and money. Widen
+  # it to "returns/" the day the app knows what to do with the others —
+  # EventBridge would start delivering them immediately, and anything the
+  # consumer cannot dispatch ends up in the DLQ.
   queue_config = {
-    inventory = { topic_prefix = "inventory_levels/" }
-    orders    = { topic_prefix = "orders/" }
-    products  = { topic_prefix = "products/" }
+    inventory         = { topic_prefix = "inventory_levels/" }
+    orders            = { topic_prefix = "orders/" }
+    products          = { topic_prefix = "products/" }
+    "returns-approve" = { topic_prefix = "returns/approve" }
   }
 
   # Cartesian product of stores x their enabled workers, keyed
@@ -71,11 +83,11 @@ locals {
 
   # ONE queue per store, not one per store x type.
   #
-  # The three types share it and stay apart by SQS message group — see
-  # local.store_rules. FIFO delivers different groups in parallel, so orders,
-  # products and inventory still process concurrently and still keep order
-  # within themselves; what changes is that a single consumer drains all three
-  # instead of three consumers draining one each.
+  # The types share it and stay apart by SQS message group — see
+  # local.store_rules. FIFO delivers different groups in parallel, so every
+  # type still processes concurrently with the others and still keeps order
+  # within itself; what changes is that a single consumer drains them all
+  # instead of one consumer per type.
   #
   # Always created, for every store, regardless of whether a consumer runs.
   # A store with its consumer off keeps accumulating webhooks rather than
@@ -93,11 +105,11 @@ locals {
 
   # EventBridge still needs one rule per (store, type): a rule lives on exactly
   # one bus and matches exactly one topic prefix, and each store has its own
-  # bus. All three of a store's rules now target that store's single queue.
+  # bus. Every one of a store's rules targets that store's single queue.
   #
   # message_group_id is the queue type. That is what preserves per-type
   # ordering inside a shared queue, and what keeps a stuck message in one type
-  # from blocking the other two.
+  # from blocking the others.
   store_rules = merge([
     for sid, s in var.stores : {
       for qt, qc in local.queue_config :
@@ -112,7 +124,7 @@ locals {
   ]...)
 
   # Rule ARNs grouped by store, so each queue policy can admit exactly the
-  # three rules that feed it and nothing else.
+  # rules that feed it and nothing else.
   store_rule_arns = {
     for sid in keys(var.stores) : sid => [
       for k, r in local.store_rules : aws_cloudwatch_event_rule.this[k].arn if r.store_id == sid
